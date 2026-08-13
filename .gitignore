@@ -27,6 +27,7 @@ backend/config/app.example.toml
 .venv/
 .venv-macos/
 deploy/runtime/
+docker-data/
 __pycache__/
 *.py[cod]
 .pytest_cache/

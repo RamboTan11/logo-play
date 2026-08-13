@@ -12,6 +12,7 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 - `backend/config/app.local.production.example.toml`: private configuration template.
 - `pycore/` and `pyproject.toml`: local Python framework and runtime dependencies.
 - `deploy/`: Windows bootstrap and local production startup scripts.
+- `docker-compose.yml` and `docker/`: Docker Compose production services and Nginx reverse proxy.
 
 ## Provision Before First Start
 
@@ -29,13 +30,35 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
    environment, then start `src.production:create_app` with Uvicorn. Startup
    applies all pending SQLite migrations and initializes the first administrator.
 
-## Deployment Model
+## Docker Compose Deployment
 
-The backend serves both the built frontend and `/api` from one origin. The
-existing `deploy/*.ps1` scripts implement this on Windows at `127.0.0.1:8099`.
-For a public Linux deployment, place Uvicorn behind a TLS reverse proxy or a
-Cloudflare Named Tunnel, run it under systemd or a container supervisor, and
-persist `backend/data/` outside ephemeral application storage.
+The Compose file runs three services:
+
+- `backend`: FastAPI on container/host port `8099`.
+- `frontend`: real Vite build served by Nginx on container/host port `5175`.
+- `nginx`: public HTTP entry point on port `80`, proxying API and WebSocket traffic.
+
+Prepare the private config and persistent directories, then start the stack:
+
+```bash
+cp backend/config/app.local.production.example.toml backend/config/app.local.toml
+mkdir -p docker-data/backend docker-data/nginx/logs
+docker compose up -d --build
+```
+
+The backend bind mount `docker-data/backend:/app/backend/data` persists the SQLite
+database and uploaded/generated assets. Never put this directory in the image or
+repository. Host ports can be changed with `HTTP_PORT`, `FRONTEND_PORT`, and
+`BACKEND_PORT`; keep direct frontend/backend ports restricted to the private network
+when Nginx is the public entry point.
+
+## Non-Docker Deployment Model
+
+The Windows `deploy/*.ps1` scripts run a combined frontend/API process at
+`127.0.0.1:8099`. In the Docker Compose deployment, Nginx is the public entry
+point and routes the separate frontend and backend containers. For a public
+Linux deployment, place the Nginx entry point behind TLS or a Cloudflare Named
+Tunnel and persist `docker-data/backend/` outside ephemeral application storage.
 
 ## Data Policy
 

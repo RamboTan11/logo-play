@@ -17,6 +17,8 @@ FastAPI 后端在同一域名提供页面和 `/api` 接口；后端当前使用 
 - `backend/config/app.local.production.example.toml`：生产私有配置模板。
 - `pycore/`：项目内使用的 Python 核心框架。
 - `deploy/`：Windows 环境的初始化、启动、状态和停止脚本。
+- `docker-compose.yml`：Docker Compose 生产编排，独立启动前端、后端和 Nginx。
+- `docker/`：前后端镜像及 Nginx 配置。
 
 ## 首次部署必须准备
 
@@ -59,9 +61,30 @@ powershell -ExecutionPolicy Bypass -File .\deploy\start-quick-tunnel.ps1
 Quick Tunnel 地址会变化，只适合验收。正式客户访问应使用固定域名的
 Cloudflare Named Tunnel 或 HTTPS 反向代理，并同步更新两个前端 Base URL。
 
-## Linux / 云服务器部署
+## Docker Compose 部署（Linux / 云服务器）
 
-仓库当前没有 Docker、systemd 或 Nginx 配置。部署程序需要自行补充：
+推荐使用仓库内的 Docker Compose 部署：
+
+```bash
+cp backend/config/app.local.production.example.toml backend/config/app.local.toml
+# 编辑 app.local.toml，填写正式管理员、加密密钥和 HTTPS 域名
+mkdir -p docker-data/backend docker-data/nginx/logs
+docker compose up -d --build
+docker compose ps
+```
+
+默认端口映射为：Nginx `80:80`、前端 `5175:80`、后端 `8099:8099`。可在启动前用环境变量改宿主端口，例如
+`HTTP_PORT=8080 FRONTEND_PORT=5176 BACKEND_PORT=8100 docker compose up -d --build`。
+正式用户访问 Nginx 端口；前端和后端端口用于运维检查，不应直接暴露到公网安全组。
+
+持久化目录是 `docker-data/backend/`（容器内 `/app/backend/data`），其中包含
+`logo_generated.db` 和 `assets/`；`docker-data/nginx/logs/` 保存 Nginx 日志。
+这些目录已被 Git 忽略，必须纳入服务器备份。首次部署使用空目录，不要复制开发机历史数据库或素材。
+
+Nginx 配置位于 `docker/nginx/default.conf`，已代理 `/api`、`/ws` 和 `/health`，并将其他路径转发给前端 SPA。
+如需 HTTPS，应在此配置前增加云负载均衡、Cloudflare Tunnel 或 TLS 反向代理。
+
+若部署环境不能使用 Docker，才需要自行补充 systemd 或其他进程管理器：
 
 1. `npm ci && npm run build:real`。
 2. 创建 Python 虚拟环境，并按 `pyproject.toml` 安装依赖。
@@ -80,7 +103,7 @@ npm ci
 npm run build:real
 ```
 
-后端生产入口固定读取 `backend/config/app.production.toml`，并自动叠加同目录
+Docker 后端入口固定读取 `backend/config/app.production.toml`，并自动叠加同目录
 未跟踪的 `backend/config/app.local.toml`。生产环境必须保持：
 
 - `app_env = "production"`
