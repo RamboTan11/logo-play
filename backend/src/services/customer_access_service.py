@@ -362,7 +362,8 @@ class CustomerAccessService:
             or parsed.password is not None
             or parsed.query
             or parsed.fragment
-            or parsed.path not in {"", "/"}
+            # The frontend may be mounted below a public reverse-proxy prefix,
+            # such as /generate-logo. Keep the path when constructing links.
         ):
             raise AuthConfigurationError("Customer frontend base URL is unavailable")
         return value
