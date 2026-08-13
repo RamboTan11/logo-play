@@ -21,6 +21,9 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 2. Copy `backend/config/app.local.production.example.toml` to
    `backend/config/app.local.toml`, then replace every `CHANGE_ME` value through
    the server secret manager or another host-private mechanism. Do not commit it.
+   Run `python3 deploy/generate-production-secrets.py` on the deployment host to
+   generate valid Fernet keys, then run
+   `python3 deploy/validate-production-config.py backend/config/app.local.toml`.
    Keep `enable_real_model_smoke_tests = true` when administrators need to run the
    real provider connectivity test; each test can consume provider quota.
 3. Set `customer_frontend_base_url` and `admin_frontend_base_url` to the final
@@ -48,6 +51,11 @@ cp backend/config/app.local.production.example.toml backend/config/app.local.tom
 mkdir -p docker-data/backend docker-data/nginx/logs
 docker compose up -d --build
 ```
+
+The Compose bind mount must target only
+`/app/backend/config/app.local.toml:ro`. Do not bind-mount the whole
+`/app/backend/config/` directory, because that hides the image's
+`app.production.toml` defaults.
 
 The backend bind mount `docker-data/backend:/app/backend/data` persists the SQLite
 database and uploaded/generated assets. Never put this directory in the image or

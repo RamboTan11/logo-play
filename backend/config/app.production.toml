@@ -4,12 +4,9 @@ api_version = "0.1.0"
 debug = false
 app_env = "production"
 enable_development_seeds = false
-cors_origins = [
-  "http://localhost:5199",
-  "http://127.0.0.1:5199",
-  "http://localhost:5175",
-  "http://127.0.0.1:5175",
-]
+# The public Nginx entry point serves the SPA and API from one origin, so it
+# does not require CORS. Do not use "*" with browser session cookies.
+cors_origins = []
 
 # Development identities are required by the shared settings schema but are
 # disabled whenever app_env is not development.

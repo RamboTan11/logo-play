@@ -68,7 +68,10 @@ Cloudflare Named Tunnel 或 HTTPS 反向代理，并同步更新两个前端 Bas
 
 ```bash
 cp backend/config/app.local.production.example.toml backend/config/app.local.toml
-# 编辑 app.local.toml，填写正式管理员、加密密钥和 HTTPS 域名
+# 在服务器上生成密钥并填入 app.local.toml；不要提交该文件
+python3 deploy/generate-production-secrets.py
+# 校验配置不会打印密钥；通过后再启动
+python3 deploy/validate-production-config.py backend/config/app.local.toml
 mkdir -p docker-data/backend docker-data/nginx/logs
 docker compose up -d --build
 docker compose ps
@@ -84,6 +87,9 @@ docker compose ps
 
 Nginx 配置位于 `docker/nginx/default.conf`，已代理 `/api`、`/ws` 和 `/health`，并将其他路径转发给前端 SPA。
 如需 HTTPS，应在此配置前增加云负载均衡、Cloudflare Tunnel 或 TLS 反向代理。
+
+不要将整个 `backend/config/` 目录挂载到容器。Compose 只应以只读方式挂载
+服务器私有的 `app.local.toml` 文件；镜像中的 `app.production.toml` 是正式默认配置。
 
 若部署环境不能使用 Docker，才需要自行补充 systemd 或其他进程管理器：
 
