@@ -14,7 +14,6 @@ from src.db.models import (
     AssetRecord,
     BatchGenerationPolicyState,
     BatchGenerationPolicyVersion,
-    DesignTask,
     EndpointIdempotencyRecord,
     GenerationCandidateJob,
     GenerationRequest,
@@ -182,22 +181,6 @@ class BatchGenerationService:
                     "invalid_source_image", "视觉参考图片不可解码", 422
                 )
         full_domain = f"{normalized_label}{domain_suffix}"
-        completed_task = await session.scalar(
-            select(DesignTask.id)
-            .where(
-                DesignTask.customer_id == customer_id,
-                DesignTask.domain == full_domain,
-                DesignTask.status == "completed",
-            )
-            .limit(1)
-        )
-        if completed_task is not None:
-            raise BatchGenerationRequestError(
-                "completed_task_exists",
-                "已有完成的任务，请前往我的方案查看",
-                409,
-            )
-
         policy_version, policy, context, connection = await self._runtime_policy(session)
         if source_asset is not None:
             context = BatchCompileContext(

@@ -10,7 +10,6 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import (
     AssetRecord,
-    DesignTask,
     LogoVersion,
     ModelConnection,
     SingleImageEditPolicyState,
@@ -120,19 +119,6 @@ class SingleImageEditService:
             if latest is None or latest.id != source.id:
                 raise SingleImageEditRequestError(
                     "stale_source_version", "请基于当前最新版本继续编辑", 409
-                )
-            completed_task = await session.scalar(
-                select(DesignTask.id)
-                .where(
-                    DesignTask.customer_id == customer_id,
-                    DesignTask.domain == source.domain,
-                    DesignTask.status == "completed",
-                )
-                .limit(1)
-            )
-            if completed_task is not None:
-                raise SingleImageEditRequestError(
-                    "completed_task_exists", "已有完成的任务，请前往我的方案查看", 409
                 )
             active_request = await session.scalar(
                 select(SingleImageEditRequest.id)

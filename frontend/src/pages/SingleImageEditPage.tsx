@@ -6,7 +6,6 @@ import { GenerationWaitingState } from '../components/GenerationWaitingState'
 import { LogoArtwork } from '../components/LogoArtwork'
 import { adoptLogo } from '../services/designTasksService'
 import {
-  GenerationApiError,
   createSingleEditGeneration,
   getSingleEditContext,
   getSingleEditStatus,
@@ -159,11 +158,11 @@ export function SingleImageEditPage() {
       } else {
         showToast(t('新版本生成失败，请稍后重试。'))
       }
-    } catch (error) {
+    } catch {
       if (chainToken !== editChainTokenRef.current) return
       clearActiveRequest()
       setIsGenerating(false)
-      showToast(error instanceof GenerationApiError ? error.message : t('新版本状态查询失败。'))
+      showToast(t('新版本状态查询失败。'))
     }
   }
 
@@ -190,8 +189,8 @@ export function SingleImageEditPage() {
         ) {
           await pollRealRequest(activeRequest, chainToken, false)
         }
-      } catch (error) {
-        if (!cancelled) showToast(error instanceof GenerationApiError ? error.message : t('单图编辑内容加载失败。'))
+      } catch {
+        if (!cancelled) showToast(t('单图编辑内容加载失败。'))
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -243,7 +242,7 @@ export function SingleImageEditPage() {
       await pollRealRequest(activeRequest, editChainTokenRef.current)
     } catch (error) {
       setIsGenerating(false)
-      showToast(error instanceof GenerationApiError ? error.message : t('生成新版本失败，请稍后重试。'))
+      showToast(t('生成新版本失败，请稍后重试。'))
     } finally {
       generationGateRef.current.leave()
     }
@@ -255,8 +254,8 @@ export function SingleImageEditPage() {
     try {
       await saveLogo(activeVersion.id, domain)
       showToast(t('收藏成功，可前往'), { label: t('我的方案'), to: '/my-plans', suffix: t('查看') })
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('收藏失败。'))
+    } catch {
+      showToast(t('收藏失败。'))
     } finally {
       setPendingAction(null)
     }
@@ -288,8 +287,8 @@ export function SingleImageEditPage() {
         result === 'completed_task_exists' ? t('已有完成交付的方案，请前往') : t('采用成功，可前往'),
         { label: t('我的方案'), to: '/my-plans', suffix: t('查看') },
       )
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('采用失败。'))
+    } catch {
+      showToast(t('采用失败。'))
     } finally {
       setPendingAction(null)
     }

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { PropsWithChildren } from 'react'
+import { useToastStore } from '../stores/useToastStore'
 
 export type ClientLanguage = 'zh-CN' | 'en'
 
@@ -26,6 +27,19 @@ const english: Record<string, string> = {
   '查看生成结果': 'View generated results',
   '正在生成 Logo 方案': 'Generating logo concepts',
   '正在根据你的域名探索设计方向，生成结果会自动显示': 'Exploring design directions for your domain. Results will appear automatically.',
+  '暂时无法生图，请联系业务人员处理。': 'Generation is temporarily unavailable. Please contact our business team for assistance.',
+  '暂时无法生图，请稍后重试。': 'Generation is temporarily unavailable. Please try again later.',
+  '暂时无法生成新方案，请稍后重试。': 'Unable to generate a new set of concepts right now. Please try again later.',
+  '暂时无法查询生成状态，请稍后重试。': 'Unable to check generation status right now. Please try again later.',
+  '暂时无法加载生成结果，请稍后重试。': 'Unable to load generated results right now. Please try again later.',
+  '方案重试失败，请稍后再试。': 'Unable to retry this concept. Please try again later.',
+  '请先输入需要设计 Logo 的域名。': 'Please enter a domain for the logo design.',
+  '本批方案生成失败，请稍后重试。': 'This set of concepts could not be generated. Please try again later.',
+  '重新生成失败，已保留原有方案。': 'Unable to generate another set. Your existing concepts have been kept.',
+  '已有完成的任务，请前往我的方案查看': 'A completed task already exists. View it in My Designs.',
+  '视觉参考上传失败，请稍后重试。': 'Unable to upload the visual reference. Please try again later.',
+  '视觉参考图片不存在': 'The visual reference is no longer available.',
+  '视觉参考图片恢复失败，请稍后重试。': 'Unable to restore the visual reference. Please try again later.',
   '品牌域名': 'Brand domain',
   '请输入域名前缀，如 igame': 'Enter a domain prefix, for example igame',
   '域名后缀': 'Domain suffix',
@@ -52,6 +66,9 @@ const english: Record<string, string> = {
   '提交成功': 'Submitted successfully',
   '采用成功，可前往': 'Adopted successfully. Go to',
   '采用失败。': 'Unable to adopt.',
+  '采用此方案后，我们会继续完善细节，并向你交付最终图片': 'After you adopt this concept, we will refine the details and deliver the final image.',
+  '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。': 'A completed delivery cannot be submitted again. Contact operations if you need to change the design.',
+  '方案详情加载失败。': 'Unable to load design details.',
   '生成结果': 'Generated results',
   '生成批次工具': 'Generation batch tools',
   '上一批': 'Previous batch',
@@ -135,7 +152,6 @@ const english: Record<string, string> = {
   '已取消': 'Canceled',
   '已收藏方案': 'Saved design',
   '编辑': 'Edit',
-  '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。': 'A completed delivery cannot be submitted again. Contact operations if you need to change the design.',
   '已有完成交付的方案，请前往': 'A completed design has already been delivered. Go to',
   '预览': 'Preview',
   '加载中...': 'Loading...',
@@ -175,6 +191,8 @@ function initialLanguage(): ClientLanguage {
 export function ClientLanguageProvider({ children }: PropsWithChildren) {
   const [language, setLanguageState] = useState<ClientLanguage>(initialLanguage)
   const setLanguage = (nextLanguage: ClientLanguage) => {
+    useToastStore.getState().clearToast()
+    if (nextLanguage === language) return
     setLanguageState(nextLanguage)
     window.localStorage.setItem(storageKey, nextLanguage)
   }

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { ApiResponse } from '../types/api'
+import { notifyAdminSessionInvalid } from '../utils/adminSession'
 import { notifyCustomerSessionInvalid } from '../utils/customerSession'
 
 // Mock-only T-001 does not issue a real request; later integration tasks reuse this client.
@@ -14,8 +15,10 @@ api.interceptors.response.use(
   (error: unknown) => {
     if (axios.isAxiosError<ApiResponse<unknown>>(error)
       && error.response?.status === 401
-      && error.response.data?.metadata?.error_code === 'customer_session_required') {
-      notifyCustomerSessionInvalid()
+    ) {
+      const errorCode = error.response.data?.metadata?.error_code
+      if (errorCode === 'customer_session_required') notifyCustomerSessionInvalid()
+      if (errorCode === 'admin_session_required') notifyAdminSessionInvalid()
     }
     return Promise.reject(error)
   },

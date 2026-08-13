@@ -1,13 +1,14 @@
 import axios from 'axios'
 import { LockKeyhole, UserRound } from 'lucide-react'
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { loginAdmin } from '../services/adminAuthService'
 import { useAdminAuthStore } from '../stores/useAdminAuthStore'
 
 export function AdminLoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const status = useAdminAuthStore((state) => state.status)
   const authorize = useAdminAuthStore((state) => state.authorize)
   const checkSession = useAdminAuthStore((state) => state.checkSession)
@@ -19,9 +20,10 @@ export function AdminLoginPage() {
   const requestedFrom = typeof location.state === 'object' && location.state && 'from' in location.state
     ? String(location.state.from)
     : ''
-  const from = requestedFrom.startsWith('/admin/') && !requestedFrom.startsWith('//')
-    ? requestedFrom
-    : '/admin/tasks'
+  const returnTo = searchParams.get('return_to') ?? ''
+  const from = [requestedFrom, returnTo].find((candidate) => (
+    candidate.startsWith('/admin/') && !candidate.startsWith('//')
+  )) ?? '/admin/tasks'
 
   useEffect(() => {
     if (status === 'unknown') void checkSession()

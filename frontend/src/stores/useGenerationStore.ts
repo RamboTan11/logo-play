@@ -26,6 +26,21 @@ const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
 const slotRetryPollIntervalMs = 300
 const slotRetryMaxPolls = 400
 
+const generationConfigurationErrorCodes = new Set([
+  'batch_policy_not_published',
+  'unverified_model_connection',
+])
+
+function customerFacingGenerationError(error: unknown, fallback: string): string {
+  if (
+    error instanceof GenerationApiError
+    && generationConfigurationErrorCodes.has(error.code)
+  ) {
+    return '暂时无法生图，请联系业务人员处理。'
+  }
+  return fallback
+}
+
 interface ActiveGeneration {
   requestId: string
   domain?: string
@@ -197,6 +212,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         if (isProcessing) {
           window.setTimeout(() => void poll(active, phase), 500)
         } else if (response.status === 'failed' && phase === 'regeneration') {
+          set({ error: '重新生成失败，已保留原有方案。' })
           useToastStore.getState().showToast('重新生成失败，已保留原有方案。')
         }
         return 'restored'
@@ -220,7 +236,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           shouldRedirectToResults: false,
           error: '本批方案生成失败，请稍后重试。',
         })
-        if (phase === 'regeneration') useToastStore.getState().showToast('重新生成失败，已保留原有方案。')
+        if (phase === 'regeneration') {
+          set({ error: '重新生成失败，已保留原有方案。' })
+          useToastStore.getState().showToast('重新生成失败，已保留原有方案。')
+        }
         return 'restored'
       }
 
@@ -278,7 +297,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         isProcessing: false,
         isRegenerating: false,
         isCompletedBatchesRestored: true,
-        error: error instanceof GenerationApiError ? error.message : '生成状态查询失败，请稍后重试。',
+        error: customerFacingGenerationError(error, '暂时无法查询生成状态，请稍后重试。'),
       })
       return 'restored'
     }
@@ -313,11 +332,6 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         return
       }
       throw error
-    }
-    if (accepted === 'completed_task_exists') {
-      set({ isProcessing: false, isRegenerating: false })
-      useToastStore.getState().showToast('已有完成的任务，请前往我的方案查看')
-      return
     }
     const active: ActiveGeneration = {
       requestId: accepted.request_id,
@@ -381,7 +395,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       } catch (error) {
         set({
           isProcessing: false,
-          error: error instanceof GenerationApiError ? error.message : '批量生成请求失败，请稍后重试。',
+          error: customerFacingGenerationError(error, '暂时无法生图，请稍后重试。'),
         })
       }
     },
@@ -394,7 +408,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       } catch (error) {
         set({
           isRegenerating: false,
-          error: error instanceof GenerationApiError ? error.message : '新一批方案生成失败，请稍后重试。',
+          error: customerFacingGenerationError(error, '暂时无法生成新方案，请稍后重试。'),
         })
       } finally {
         regenerationGate.leave()
@@ -458,11 +472,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         if (!terminal) throw new Error('方案重试等待超时，请稍后再试。')
       } catch (error) {
         set({
-          error: error instanceof GenerationApiError
-            ? error.message
-            : error instanceof Error && error.message
-              ? error.message
-              : '方案重试失败，请稍后再试。',
+          error: customerFacingGenerationError(error, '方案重试失败，请稍后再试。'),
         })
       } finally {
         set({
@@ -524,7 +534,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         if (recoveryId !== recoverySequence) return
         set({
           isCompletedBatchesRestored: true,
-          error: error instanceof GenerationApiError ? error.message : null,
+          error: error instanceof GenerationApiError
+            ? customerFacingGenerationError(error, '暂时无法加载生成结果，请稍后重试。')
+            : null,
         })
       }
     },

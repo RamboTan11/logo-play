@@ -39,7 +39,7 @@ export function AdoptionConfirmDialog({
         <header><div><h2 id="saved-adopt-title">{t(isChange ? '确认变更方案' : '确认采用方案')}</h2><p id="saved-adopt-description">{domain}</p></div><button type="button" aria-label={t('关闭采用确认')} disabled={isSubmitting} onClick={onClose}>×</button></header>
         <div className="saved-logo-adopt-body">
           {isChange && <p className="adoption-change-warning">{t('已有提交的方案，请确认是否发起变更')}</p>}
-          {errorMessage && <p className="adoption-confirm-error" role="alert">{errorMessage}</p>}
+          {errorMessage && <p className="adoption-confirm-error" role="alert">{t(errorMessage)}</p>}
           <label className="adoption-note-field"><span>{t('人工精修建议（选填）')}</span><textarea ref={inputRef} value={suggestion} disabled={isSubmitting} placeholder={t('可输入你的精修建议')} onChange={(event) => setSuggestion(event.target.value)} /></label>
         </div>
         <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={onClose}>{t('取消')}</button><div className="adopt-tooltip"><button className="primary" type="button" disabled={isSubmitting} onClick={() => onConfirm(suggestion)}>{t(isSubmitting ? '提交中...' : isChange ? '确认变更' : '确认采用')}</button><span>{t(adoptTooltip)}</span></div></footer>

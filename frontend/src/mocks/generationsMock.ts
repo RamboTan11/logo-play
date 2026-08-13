@@ -205,9 +205,6 @@ export async function createBatchGenerationMock(
 ): Promise<ApiResponse<BatchGenerationData>> {
   await new Promise((resolve) => window.setTimeout(resolve, 240))
   const domain = normalizeDomain(`${request.domain_label.trim()}${request.domain_suffix}`)
-  if (readMockTasks().some((task) => task.customer_id === mockCustomerId && task.domain === domain && task.status === 'completed')) {
-    return { code: 409, message: 'completed_task_exists', data: {} as BatchGenerationData }
-  }
   batchSequence += 1
   const requestId = `mock-${request.domain_label.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'generation'}-${Date.now()}-${batchSequence}`
   const targetCount = getActiveBatchGenerationTargetCountMock()

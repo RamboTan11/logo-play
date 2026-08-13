@@ -36,7 +36,15 @@ CustomerSessionDependency = Annotated[AuthenticatedPrincipal, Depends(require_cu
 
 
 def _secure_cookie(request: Request) -> bool:
-    return bool(request.app.state.settings.app_env.strip().lower() != "development")
+    """Use Secure cookies only when the browser-facing request is HTTPS.
+
+    Production is expected to terminate TLS before this service, while local
+    pre-production runs on loopback HTTP. Browsers such as Safari reject a
+    Secure cookie received over HTTP, so environment alone is insufficient.
+    """
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    return (forwarded_proto or request.url.scheme).lower() == "https"
 
 
 @router.post("/admin/auth/login")

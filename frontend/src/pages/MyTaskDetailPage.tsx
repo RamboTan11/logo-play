@@ -22,7 +22,7 @@ export function MyTaskDetailPage() {
     let active = true
     getMyTask(taskId)
       .then((nextTask) => { if (active) setTask(nextTask) })
-      .catch((error: unknown) => { if (active) showToast(error instanceof Error ? error.message : t('方案详情加载失败。')) })
+      .catch(() => { if (active) showToast(t('方案详情加载失败。')) })
       .finally(() => { if (active) setIsLoading(false) })
     return () => { active = false }
   }, [showToast, t, taskId])

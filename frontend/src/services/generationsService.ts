@@ -21,8 +21,6 @@ import type {
   SingleEditStatusData,
 } from '../types/api'
 
-export type MockBatchGenerationResult = BatchGenerationData | 'completed_task_exists'
-
 export class GenerationApiError extends Error {
   readonly code: string
 
@@ -66,12 +64,12 @@ export async function createBatchGeneration(
   domainSuffix: DomainSuffix,
   sourceImageAssetId?: string | null,
   userReferenceRequirement?: string | null,
-): Promise<MockBatchGenerationResult> {
+): Promise<BatchGenerationData> {
   if (isMockMode) {
     const response = await createBatchGenerationMock(buildBatchGenerationPayload(
       domainLabel, domainSuffix, sourceImageAssetId, userReferenceRequirement,
     ))
-    return response.code === 409 ? 'completed_task_exists' : response.data
+    return response.data
   }
   try {
     const response = await api.post<ApiResponse<BatchGenerationData>>(
@@ -82,10 +80,8 @@ export async function createBatchGeneration(
     )
     return response.data.data
   } catch (error) {
-    const code = errorCode(error)
-    if (code === 'completed_task_exists') return code
     throw new GenerationApiError(
-      code ?? 'generation_request_failed',
+      errorCode(error) ?? 'generation_request_failed',
       errorMessage(error) ?? '批量生成请求失败，请稍后重试。',
     )
   }

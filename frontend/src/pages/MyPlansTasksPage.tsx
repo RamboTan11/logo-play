@@ -220,9 +220,9 @@ export function MyPlansTasksPage() {
       if (activeRef && !activeRef.current) return
       setSavedLogos(nextSavedLogos)
       setTasks(nextTasks)
-    } catch (error: unknown) {
+    } catch {
       if (!activeRef || activeRef.current) {
-        setPageLoadError(error instanceof Error ? error.message : t('方案与任务加载失败，请稍后重试。'))
+        setPageLoadError(t('方案与任务加载失败，请稍后重试。'))
       }
     } finally {
       if (!activeRef || activeRef.current) setIsLoading(false)
@@ -246,8 +246,8 @@ export function MyPlansTasksPage() {
     setDetailLoadError(null)
     try {
       setSelectedTask(await getMyTask(taskId))
-    } catch (error) {
-      setDetailLoadError({ taskId, message: error instanceof Error ? error.message : t('方案详情加载失败，请稍后重试。') })
+    } catch {
+      setDetailLoadError({ taskId, message: t('方案详情加载失败，请稍后重试。') })
     } finally {
       setOpeningTaskId(null)
     }
@@ -278,8 +278,8 @@ export function MyPlansTasksPage() {
       setIsChangingActiveTask(false)
       showToast(t('采用成功'))
       await refreshTasks()
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('采用失败。'))
+    } catch {
+      showToast(t('采用失败。'))
     } finally {
       setIsAdoptingSavedLogo(false)
     }
@@ -310,8 +310,8 @@ export function MyPlansTasksPage() {
       setSuggestionError(null)
       showToast(t('修改建议已提交'))
       await refreshTasks()
-    } catch (error) {
-      setSuggestionError(error instanceof Error ? error.message : t('修改建议失败，请稍后重试。'))
+    } catch {
+      setSuggestionError(t('修改建议失败，请稍后重试。'))
     } finally {
       setIsUpdatingSuggestion(false)
     }

@@ -220,7 +220,14 @@ export function TaskCenterPage() {
   const openTask = useCallback(async (taskId: string) => {
     if (busyTaskId) return
     setBusyTaskId(taskId)
-    try { setSelectedTask(await getTaskCenterTask(taskId)) } catch (error) { showToast(errorMessage(error, '任务详情加载失败，请稍后重试。')) } finally { setBusyTaskId(null) }
+    try {
+      setSelectedTask(await getTaskCenterTask(taskId))
+      openedDeepLinkTaskIdRef.current = taskId
+    } catch (error) {
+      showToast(errorMessage(error, '任务详情加载失败，请稍后重试。'))
+    } finally {
+      setBusyTaskId(null)
+    }
   }, [busyTaskId, showToast])
   const deepLinkTaskId = searchParams.get('task_id')
   useEffect(() => {
@@ -228,11 +235,10 @@ export function TaskCenterPage() {
       openedDeepLinkTaskIdRef.current = null
       return
     }
-    if (openedDeepLinkTaskIdRef.current === deepLinkTaskId) return
+    if (openedDeepLinkTaskIdRef.current === deepLinkTaskId && selectedTask?.id === deepLinkTaskId) return
     if (busyTaskId) return
-    openedDeepLinkTaskIdRef.current = deepLinkTaskId
     void Promise.resolve().then(() => openTask(deepLinkTaskId))
-  }, [busyTaskId, deepLinkTaskId, openTask])
+  }, [busyTaskId, deepLinkTaskId, openTask, selectedTask?.id])
   const closeTaskDetail = () => {
     setSelectedTask(null)
     if (!searchParams.has('task_id')) return

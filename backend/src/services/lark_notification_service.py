@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from typing import Any, cast
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -690,7 +690,7 @@ class LarkNotificationService:
                     event_type=item.event_type,
                     task_id=item.task_id,
                     task_url=(
-                        f"{self._admin_base_url}/admin/tasks?task_id={item.task_id}"
+                        self._task_login_url(item.task_id)
                         if item.task_id
                         else None
                     ),
@@ -944,7 +944,7 @@ class LarkNotificationService:
                 customer_name=customer_name,
                 domain=task.domain,
                 submitted_at=task.submitted_at,
-                task_url=f"{self._admin_base_url}/admin/tasks?task_id={task.id}",
+                task_url=self._task_login_url(task.id),
             )
             attempt = await self._client.send(
                 webhook, _with_signature(card, signing_secret, now)
@@ -1015,6 +1015,10 @@ class LarkNotificationService:
             else None
         )
         return webhook, signing
+
+    def _task_login_url(self, task_id: str) -> str:
+        task_path = f"/admin/tasks?task_id={quote(task_id, safe='')}"
+        return f"{self._admin_base_url}/admin/login?return_to={quote(task_path, safe='')}"
 
     async def _mention_targets(
         self, session: AsyncSession, recipient_ids: list[str]

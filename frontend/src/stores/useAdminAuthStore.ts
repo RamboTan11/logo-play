@@ -6,6 +6,7 @@ type AdminAuthStatus = 'unknown' | 'checking' | 'authorized' | 'unauthorized'
 interface AdminAuthState {
   status: AdminAuthStatus
   authorize: () => void
+  invalidate: () => void
   checkSession: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -13,6 +14,7 @@ interface AdminAuthState {
 export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
   status: 'unknown',
   authorize: () => set({ status: 'authorized' }),
+  invalidate: () => set({ status: 'unauthorized' }),
   checkSession: async () => {
     if (get().status === 'checking') return
     set({ status: 'checking' })

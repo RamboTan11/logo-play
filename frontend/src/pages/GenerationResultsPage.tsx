@@ -81,8 +81,8 @@ export function GenerationResultsPage() {
     try {
       await saveLogo(id, batch.domain)
       showToast(t('收藏成功，可前往'), { label: t('我的方案'), to: '/my-plans', suffix: t('查看') })
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('收藏失败。'))
+    } catch {
+      showToast(t('收藏失败。'))
     } finally {
       setPendingAction(null)
     }
@@ -113,8 +113,8 @@ export function GenerationResultsPage() {
         result === 'completed_task_exists' ? t('已有完成交付的方案，请前往') : t('采用成功，可前往'),
         { label: t('我的方案'), to: '/my-plans', suffix: t('查看') },
       )
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('采用失败。'))
+    } catch {
+      showToast(t('采用失败。'))
     } finally {
       setPendingAction(null)
     }
@@ -157,7 +157,7 @@ export function GenerationResultsPage() {
                         onClick={() => option.retry_token
                           && void retrySlot(batch.request_id, option.slot_index, option.retry_token)}
                       ><RefreshCw aria-hidden="true" /></button>
-                      <span>{option.failure?.message ?? t('此方案生成失败，请重试。')}</span>
+                      <span>{t('此方案生成失败，请重试。')}</span>
                     </article>
                   }
                   const selected = selectedOptionId === option.logo_version_id

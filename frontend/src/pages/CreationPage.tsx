@@ -56,7 +56,7 @@ export function CreationPage() {
   const [sourceUpload] = useState(() => new GenerationSourceUploadLifecycle({
       createObjectUrl: (file) => URL.createObjectURL(file),
       revokeObjectUrl: (url) => URL.revokeObjectURL(url),
-      onError: (message) => showToast(message),
+      onError: (message) => showToast(t(message)),
       onStateChange: (state) => {
         setSourceUploadState(state)
         if (!state.assetId && !state.isUploading) clearSourceImage()
@@ -118,10 +118,6 @@ export function CreationPage() {
   useEffect(() => {
     if (completedGeneration && shouldRedirectToResults) navigate('/results')
   }, [completedGeneration, navigate, shouldRedirectToResults])
-
-  useEffect(() => {
-    if (error) showToast(error)
-  }, [error, showToast])
 
   useEffect(() => {
     if (!isSuffixOpen) return
@@ -246,7 +242,7 @@ export function CreationPage() {
               </ul>}
             </div>
           </div>
-          {error && <div className="inline-error">{error}</div>}
+          {error && <div className="inline-error">{t(error)}</div>}
           <div className="creation-source-control">
             <div className="creation-source-preview-row">
               <div
