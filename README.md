@@ -16,6 +16,7 @@ FastAPI 后端在同一域名提供页面和 `/api` 接口；后端当前使用 
 - `backend/config/app.production.toml`：非敏感生产默认配置。
 - `backend/config/app.local.production.example.toml`：生产私有配置模板。
 - `pycore/`：项目内使用的 Python 核心框架。
+- `requirements.txt`：已导出的、锁定版本的 Python 生产运行依赖。
 - `deploy/`：Windows 环境的初始化、启动、状态和停止脚本。
 - `docker-compose.yml`：Docker Compose 生产编排，独立启动前端、后端和 Nginx。
 - `docker/`：前后端镜像及 Nginx 配置。
@@ -87,7 +88,7 @@ Nginx 配置位于 `docker/nginx/default.conf`，已代理 `/api`、`/ws` 和 `/
 若部署环境不能使用 Docker，才需要自行补充 systemd 或其他进程管理器：
 
 1. `npm ci && npm run build:real`。
-2. 创建 Python 虚拟环境，并按 `pyproject.toml` 安装依赖。
+2. 创建 Python 虚拟环境，并执行 `python -m pip install -r requirements.txt` 安装依赖。
 3. 使用 Uvicorn 启动 `src.production:create_app`。
 4. 用 systemd、容器编排或其他进程管理器常驻运行。
 5. 在 Uvicorn 前配置 HTTPS 反向代理或 Cloudflare Named Tunnel。

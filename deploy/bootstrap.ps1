@@ -13,15 +13,12 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
     }
 }
 
-$dependencyReader = Join-Path $PSScriptRoot 'read-dependencies.py'
-$projectConfiguration = Join-Path $projectRoot 'pyproject.toml'
-$dependencyJson = & $venvPython $dependencyReader $projectConfiguration
-if ($LASTEXITCODE -ne 0) {
-    throw 'Failed to read project dependencies from pyproject.toml.'
+$requirementsFile = Join-Path $projectRoot 'requirements.txt'
+if (-not (Test-Path -LiteralPath $requirementsFile)) {
+    throw 'Production dependency file requirements.txt was not found.'
 }
-$dependencies = @($dependencyJson | ConvertFrom-Json)
 
-& $venvPython -m pip install @dependencies
+& $venvPython -m pip install --requirement $requirementsFile
 if ($LASTEXITCODE -ne 0) {
     throw "Dependency installation failed with exit code $LASTEXITCODE"
 }

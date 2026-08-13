@@ -1,0 +1,17 @@
+# Production Python runtime dependencies for Python 3.11.
+# Install with: python -m pip install --requirement requirements.txt
+aiosqlite==0.22.1
+cryptography==50.0.0
+fastapi==0.141.1
+httpx==0.28.1
+loguru==0.7.3
+openpyxl==3.1.5
+pillow==12.3.0
+pydantic==2.13.4
+pydantic-settings==2.15.0
+python-dotenv==1.2.2
+python-multipart==0.0.32
+PyYAML==6.0.3
+SQLAlchemy==2.0.52
+tzdata==2026.3
+uvicorn[standard]==0.52.1

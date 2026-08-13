@@ -10,7 +10,8 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 - `backend/src/`: FastAPI application, business services, and database migrations.
 - `backend/config/app.production.toml`: non-secret production defaults.
 - `backend/config/app.local.production.example.toml`: private configuration template.
-- `pycore/` and `pyproject.toml`: local Python framework and runtime dependencies.
+- `pycore/`, `pyproject.toml`, and `requirements.txt`: local Python framework,
+  package metadata, and exported locked runtime dependencies.
 - `deploy/`: Windows bootstrap and local production startup scripts.
 - `docker-compose.yml` and `docker/`: Docker Compose production services and Nginx reverse proxy.
 
@@ -28,7 +29,7 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 4. Create writable, persistent directories `backend/data/` and
    `backend/data/assets/`. They are runtime data and must be backed up together.
 5. Run `npm ci` followed by `npm run build:real` in `frontend/`.
-6. Install Python dependencies from `pyproject.toml` into an isolated virtual
+6. Install Python dependencies from `requirements.txt` into an isolated virtual
    environment, then start `src.production:create_app` with Uvicorn. Startup
    applies all pending SQLite migrations and initializes the first administrator.
 
