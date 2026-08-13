@@ -13,6 +13,8 @@ from src.models.auth import AdminLoginRequest, CustomerAccessVerifyRequest
 from src.services.auth_service import (
     ADMIN_SESSION_COOKIE,
     CUSTOMER_SESSION_COOKIE,
+    LEGACY_SESSION_COOKIE_PATH,
+    SESSION_COOKIE_PATH,
     SESSION_MAX_AGE_SECONDS,
     AuthConfigurationError,
     AuthenticatedPrincipal,
@@ -82,11 +84,12 @@ async def login_admin(
         token,
         max_age=SESSION_MAX_AGE_SECONDS,
         expires=expires_at,
-        path="/api/v1",
+        path=SESSION_COOKIE_PATH,
         secure=_secure_cookie(request),
         httponly=True,
         samesite="lax",
     )
+    response.delete_cookie(ADMIN_SESSION_COOKIE, path=LEGACY_SESSION_COOKIE_PATH, samesite="lax")
     response.headers["Cache-Control"] = "private, no-store"
     return success_response(data={"authenticated": True})
 
@@ -112,7 +115,8 @@ async def logout_admin(
             request.cookies.get(ADMIN_SESSION_COOKIE),
             trace_id=uuid4().hex,
         )
-    response.delete_cookie(ADMIN_SESSION_COOKIE, path="/api/v1", samesite="lax")
+    response.delete_cookie(ADMIN_SESSION_COOKIE, path=SESSION_COOKIE_PATH, samesite="lax")
+    response.delete_cookie(ADMIN_SESSION_COOKIE, path=LEGACY_SESSION_COOKIE_PATH, samesite="lax")
     response.headers["Cache-Control"] = "private, no-store"
     return success_response(data={"logged_out": True})
 
@@ -164,11 +168,12 @@ async def verify_customer_access(
         token,
         max_age=max(0, int((expires_at - utc_now()).total_seconds())),
         expires=expires_at,
-        path="/api/v1",
+        path=SESSION_COOKIE_PATH,
         secure=_secure_cookie(request),
         httponly=True,
         samesite="lax",
     )
+    response.delete_cookie(CUSTOMER_SESSION_COOKIE, path=LEGACY_SESSION_COOKIE_PATH, samesite="lax")
     response.headers["Cache-Control"] = "private, no-store"
     return success_response(data={"authenticated": True})
 
@@ -194,6 +199,7 @@ async def logout_customer(
             request.cookies.get(CUSTOMER_SESSION_COOKIE),
             trace_id=uuid4().hex,
         )
-    response.delete_cookie(CUSTOMER_SESSION_COOKIE, path="/api/v1", samesite="lax")
+    response.delete_cookie(CUSTOMER_SESSION_COOKIE, path=SESSION_COOKIE_PATH, samesite="lax")
+    response.delete_cookie(CUSTOMER_SESSION_COOKIE, path=LEGACY_SESSION_COOKIE_PATH, samesite="lax")
     response.headers["Cache-Control"] = "private, no-store"
     return success_response(data={"logged_out": True})

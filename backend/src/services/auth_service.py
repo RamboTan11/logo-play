@@ -24,6 +24,8 @@ from src.services.event_service import EventService
 
 ADMIN_SESSION_COOKIE = "logo_admin_session"
 CUSTOMER_SESSION_COOKIE = "logo_customer_session"
+SESSION_COOKIE_PATH = "/"
+LEGACY_SESSION_COOKIE_PATH = "/api/v1"
 SESSION_MAX_AGE_SECONDS = 12 * 60 * 60
 _PASSWORD_SCHEME = "scrypt-v1"
 _SCRYPT_N = 2**14

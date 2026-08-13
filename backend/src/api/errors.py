@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from pycore.api.responses import error_response
+from src.services.auth_service import LEGACY_SESSION_COOKIE_PATH, SESSION_COOKIE_PATH
 
 
 class ApplicationHTTPException(HTTPException):
@@ -47,7 +48,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         response = _json_error(str(exc.detail), error_code, exc.status_code)
         clear_cookie = getattr(exc, "clear_cookie", None)
         if clear_cookie:
-            response.delete_cookie(clear_cookie, path="/api/v1", samesite="lax")
+            response.delete_cookie(clear_cookie, path=SESSION_COOKIE_PATH, samesite="lax")
+            response.delete_cookie(clear_cookie, path=LEGACY_SESSION_COOKIE_PATH, samesite="lax")
         return response
 
     @app.exception_handler(RequestValidationError)
