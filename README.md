@@ -72,21 +72,21 @@ cp backend/config/app.local.production.example.toml backend/config/app.toml
 python3 deploy/generate-production-secrets.py
 # 校验配置不会打印密钥；通过后再启动
 python3 deploy/validate-production-config.py backend/config/app.toml
-mkdir -p docker-data/backend docker-data/nginx/logs
+mkdir -p docker-data/backend
 docker compose up -d --build
 docker compose ps
 ```
 
-默认端口映射为：Nginx `80:80`、前端 `5175:80`、后端 `8099:8099`。可在启动前用环境变量改宿主端口，例如
-`HTTP_PORT=8080 FRONTEND_PORT=5176 BACKEND_PORT=8100 docker compose up -d --build`。
-正式用户访问 Nginx 端口；前端和后端端口用于运维检查，不应直接暴露到公网安全组。
+默认端口映射为：前端容器内置 Nginx `8098:80`、后端 `8099:8099`。可在启动前用环境变量改宿主端口，例如
+`FRONTEND_PORT=8098 BACKEND_PORT=8099 docker compose up -d --build`。
+正式用户访问前端容器的 Nginx 端口 `8098`；后端 `8099` 仅用于运维检查，建议限制公网访问安全组。
 
 持久化目录是 `docker-data/backend/`（容器内 `/app/backend/data`），其中包含
-`logo_generated.db` 和 `assets/`；`docker-data/nginx/logs/` 保存 Nginx 日志。
-这些目录已被 Git 忽略，必须纳入服务器备份。首次部署使用空目录，不要复制开发机历史数据库或素材。
+`logo_generated.db` 和 `assets/`。这些目录已被 Git 忽略，必须纳入服务器备份。
+首次部署使用空目录，不要复制开发机历史数据库或素材。
 
-Nginx 配置位于 `docker/nginx/default.conf`，已代理 `/api`、`/ws` 和 `/health`，并将其他路径转发给前端 SPA。
-如需 HTTPS，应在此配置前增加云负载均衡、Cloudflare Tunnel 或 TLS 反向代理。
+前端容器使用 `docker/frontend.conf` 作为唯一 Nginx 配置，代理 `/api`、`/ws` 和 `/health`，并将其他路径提供给前端 SPA。
+如需 HTTPS，应在该容器前增加云负载均衡、Cloudflare Tunnel 或宿主机 TLS 反向代理，不要再在 Compose 内启动第二个 Nginx。
 
 Compose 按当前生产方式只读挂载整个 `backend/config/` 目录；该宿主机目录中必须
 存在完整的 `app.toml`。不要直接挂载空目录，否则容器无法读取配置。

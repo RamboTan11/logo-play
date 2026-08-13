@@ -13,7 +13,7 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 - `pycore/`, `pyproject.toml`, and `requirements.txt`: local Python framework,
   package metadata, and exported locked runtime dependencies.
 - `deploy/`: Windows bootstrap and local production startup scripts.
-- `docker-compose.yml` and `docker/`: Docker Compose production services and Nginx reverse proxy.
+- `docker-compose.yml` and `docker/`: Docker Compose production services; the frontend container includes the only Nginx web entry point.
 
 ## Provision Before First Start
 
@@ -40,17 +40,16 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 
 ## Docker Compose Deployment
 
-The Compose file runs three services:
+The Compose file runs two services:
 
 - `backend`: FastAPI on container/host port `8099`.
-- `frontend`: real Vite build served by Nginx on container/host port `5175`.
-- `nginx`: public HTTP entry point on port `80`, proxying API and WebSocket traffic.
+- `frontend`: real Vite build served by its own Nginx, mapped from host port `8098` to container port `80`. Its `docker/frontend.conf` proxies API and WebSocket traffic to `backend`.
 
 Prepare the private config and persistent directories, then start the stack:
 
 ```bash
 cp backend/config/app.local.production.example.toml backend/config/app.toml
-mkdir -p docker-data/backend docker-data/nginx/logs
+mkdir -p docker-data/backend
 docker compose up -d --build
 ```
 
@@ -61,17 +60,19 @@ copy source, not a fallback after the directory is mounted.
 
 The backend bind mount `docker-data/backend:/app/backend/data` persists the SQLite
 database and uploaded/generated assets. Never put this directory in the image or
-repository. Host ports can be changed with `HTTP_PORT`, `FRONTEND_PORT`, and
-`BACKEND_PORT`; keep direct frontend/backend ports restricted to the private network
-when Nginx is the public entry point.
+repository. Host ports can be changed with `FRONTEND_PORT` and `BACKEND_PORT`; keep
+the direct backend port restricted to the private network. The frontend container's
+built-in Nginx is the public web entry point, so Compose must not start another Nginx
+service.
 
 ## Non-Docker Deployment Model
 
 The Windows `deploy/*.ps1` scripts run a combined frontend/API process at
-`127.0.0.1:8099`. In the Docker Compose deployment, Nginx is the public entry
-point and routes the separate frontend and backend containers. For a public
-Linux deployment, place the Nginx entry point behind TLS or a Cloudflare Named
-Tunnel and persist `docker-data/backend/` outside ephemeral application storage.
+`127.0.0.1:8099`. In the Docker Compose deployment, the frontend container's Nginx
+is the public entry point and routes the separate frontend and backend containers.
+For a public Linux deployment, place TLS or a Cloudflare Named Tunnel in front of
+the frontend container and persist `docker-data/backend/` outside ephemeral
+application storage.
 
 ## Data Policy
 
