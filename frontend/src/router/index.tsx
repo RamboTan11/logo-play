@@ -30,4 +30,4 @@ export const router = createBrowserRouter([
   { path: '/admin/model-strategy/models', element: <AdminProtectedRoute><ModelConnectionsPage /></AdminProtectedRoute> },
   { path: '/admin/model-strategy/batch', element: <AdminProtectedRoute><BatchGenerationPolicyPage /></AdminProtectedRoute> },
   { path: '/admin/model-strategy/single-edit', element: <AdminProtectedRoute><SingleEditPolicyPage /></AdminProtectedRoute> },
-])
+], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || undefined })

@@ -45,6 +45,25 @@ The Compose file runs two services:
 - `backend`: FastAPI on container/host port `8099`.
 - `frontend`: real Vite build served by its own Nginx, mapped from host port `8098` to container port `80`. Its `docker/frontend.conf` proxies API and WebSocket traffic to `backend`.
 
+The production frontend is built with the public base path `/generate-logo/`.
+When a host-level Nginx is used, proxy that prefix to the frontend host port and
+keep the trailing slash on `proxy_pass` so the container receives `/assets/*`,
+`/api/*`, and `/ws` without the public prefix:
+
+```nginx
+location ^~ /generate-logo/ {
+    proxy_pass http://127.0.0.1:8098/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_read_timeout 300s;
+}
+```
+
 Prepare the private config and persistent directories, then start the stack:
 
 ```bash
@@ -52,6 +71,10 @@ cp backend/config/app.local.production.example.toml backend/config/app.toml
 mkdir -p docker-data/backend
 docker compose up -d --build
 ```
+
+If the public path or API prefix changes, pass matching build arguments before
+building, for example `VITE_PUBLIC_BASE_PATH=/generate-logo/` and
+`VITE_API_BASE_URL=/generate-logo/api`.
 
 The Compose bind mount uses the whole host-private `backend/config/` directory,
 and the container entry point reads `app.toml` from that directory. The file

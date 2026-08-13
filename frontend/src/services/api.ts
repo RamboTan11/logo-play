@@ -5,7 +5,7 @@ import { notifyCustomerSessionInvalid } from '../utils/customerSession'
 
 // Mock-only T-001 does not issue a real request; later integration tasks reuse this client.
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || `${import.meta.env.BASE_URL}api`,
   timeout: 10000,
   withCredentials: true,
 })

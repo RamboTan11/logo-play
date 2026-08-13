@@ -15,11 +15,15 @@ export default defineConfig(({ mode }) => {
   const backendTarget = process.env.VITE_BACKEND_PROXY_TARGET
     ?? env.VITE_BACKEND_PROXY_TARGET
     ?? 'http://localhost:8099'
+  const publicBasePath = process.env.VITE_PUBLIC_BASE_PATH
+    ?? env.VITE_PUBLIC_BASE_PATH
+    ?? '/'
   const serverPort = requestedPort()
   const useMock = mockMode === 'true'
 
   return {
     plugins: [react()],
+    base: publicBasePath.endsWith('/') ? publicBasePath : `${publicBasePath}/`,
     define: {
       'import.meta.env.VITE_USE_MOCK': JSON.stringify(mockMode),
     },

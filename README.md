@@ -85,7 +85,7 @@ docker compose ps
 `logo_generated.db` 和 `assets/`。这些目录已被 Git 忽略，必须纳入服务器备份。
 首次部署使用空目录，不要复制开发机历史数据库或素材。
 
-前端容器使用 `docker/frontend.conf` 作为唯一 Nginx 配置，代理 `/api`、`/ws` 和 `/health`，并将其他路径提供给前端 SPA。
+前端容器使用 `docker/frontend.conf` 作为唯一 Nginx 配置，代理 `/api`、`/ws` 和 `/health`，并将其他路径提供给前端 SPA。当前生产构建默认使用 `/generate-logo/` 子路径；宿主机 Nginx 应使用 `location ^~ /generate-logo/` 将请求转发到 `http://127.0.0.1:8098/`，保留 `proxy_pass` 末尾 `/` 以剥离该前缀。
 如需 HTTPS，应在该容器前增加云负载均衡、Cloudflare Tunnel 或宿主机 TLS 反向代理，不要再在 Compose 内启动第二个 Nginx。
 
 Compose 按当前生产方式只读挂载整个 `backend/config/` 目录；该宿主机目录中必须

@@ -2,6 +2,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app/frontend
 
+ARG VITE_PUBLIC_BASE_PATH=/generate-logo/
+ARG VITE_API_BASE_URL=/generate-logo/api
+ENV VITE_PUBLIC_BASE_PATH=${VITE_PUBLIC_BASE_PATH}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
