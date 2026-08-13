@@ -1,4 +1,5 @@
-# Public production settings. Secrets remain in the untracked app.local.toml.
+# Public production fallback settings. Deployments using a mounted config
+# directory should copy the complete example to the private app.toml.
 app_title = "Logo Generated API"
 api_version = "0.1.0"
 debug = false
@@ -17,8 +18,16 @@ development_customer_access_link = "disabled-in-production"
 
 database_path = "data/logo_generated.db"
 asset_root = "data/assets"
-admin_frontend_base_url = "http://127.0.0.1:8099"
+customer_frontend_base_url = "https://app.example.com"
+admin_frontend_base_url = "https://app.example.com"
 lark_worker_enabled = true
 lark_worker_interval_seconds = 5
 lark_delivery_max_attempts = 3
 lark_claim_lease_seconds = 60
+lark_config_encryption_key = ""
+auth_session_secret = ""
+customer_access_token_encryption_key = ""
+model_connection_secret_encryption_key = ""
+initial_admin_username = ""
+initial_admin_password = ""
+enable_real_model_smoke_tests = false

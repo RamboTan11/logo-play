@@ -7,9 +7,8 @@ services:
       - "${BACKEND_PORT:-8099}:8099"
     volumes:
       - ${RUNTIME_DATA_DIR:-./docker-data/backend}:/app/backend/data
-      # Mount exactly one host-private override file. Mounting config/ as a
-      # directory would hide the image's app.production.toml.
-      - ${BACKEND_LOCAL_CONFIG:-./backend/config/app.local.toml}:/app/backend/config/app.local.toml:ro
+      # The host directory must contain a complete operator-managed app.toml.
+      - ${BACKEND_CONFIG_DIR:-./backend/config}:/app/backend/config:ro
     environment:
       PYTHONUNBUFFERED: "1"
     restart: unless-stopped

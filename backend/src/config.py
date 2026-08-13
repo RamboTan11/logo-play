@@ -101,12 +101,16 @@ def local_config_path() -> Path:
 def load_settings(config_path: Path | None = None) -> AppSettings:
     """Load public configuration and optional untracked private configuration."""
 
+    selected_path = config_path or default_config_path()
     manager = ConfigManager[FileSettings]()
-    manager.load(FileSettings, config_path or default_config_path())
+    manager.load(FileSettings, selected_path)
     file_settings = cast(FileSettings, manager.settings)
     values = file_settings.model_dump()
-    private_path = local_config_path()
-    if private_path.exists():
+    # A host-mounted app.toml is already the complete operator configuration.
+    # Only the repository's app.production.toml receives the optional private
+    # overlay used by the single-file production deployment model.
+    private_path = local_config_path() if selected_path.name == "app.production.toml" else None
+    if private_path is not None and private_path.exists():
         private_manager = ConfigManager[PrivateSettings]()
         private_manager.load(PrivateSettings, private_path)
         private_settings = cast(PrivateSettings, private_manager.settings)

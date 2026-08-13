@@ -9,7 +9,7 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 - `frontend/`: React/Vite source and reproducible npm dependency lockfile.
 - `backend/src/`: FastAPI application, business services, and database migrations.
 - `backend/config/app.production.toml`: non-secret production defaults.
-- `backend/config/app.local.production.example.toml`: private configuration template.
+- `backend/config/app.local.production.example.toml`: complete private production configuration template.
 - `pycore/`, `pyproject.toml`, and `requirements.txt`: local Python framework,
   package metadata, and exported locked runtime dependencies.
 - `deploy/`: Windows bootstrap and local production startup scripts.
@@ -18,16 +18,18 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 ## Provision Before First Start
 
 1. Install Python 3.11+ and Node.js 20+ on the deployment host.
-2. Copy `backend/config/app.local.production.example.toml` to
-   `backend/config/app.local.toml`, then replace every `CHANGE_ME` value through
-   the server secret manager or another host-private mechanism. Do not commit it.
+2. Copy `backend/config/app.local.production.example.toml` to `backend/config/app.toml`, then
+   edit the host-private file with the final administrator, domain, and backend
+   settings. Do not commit it.
    Run `python3 deploy/generate-production-secrets.py` on the deployment host to
    generate valid Fernet keys, then run
-   `python3 deploy/validate-production-config.py backend/config/app.local.toml`.
+   `python3 deploy/validate-production-config.py backend/config/app.toml`. Empty
+   encryption fields are allowed for initial startup; related admin features
+   remain unavailable until configured.
    Keep `enable_real_model_smoke_tests = true` when administrators need to run the
    real provider connectivity test; each test can consume provider quota.
 3. Set `customer_frontend_base_url` and `admin_frontend_base_url` to the final
-   HTTPS domain. Update `cors_origins` in `backend/config/app.production.toml`
+   HTTPS domain. Update `cors_origins` in the private `backend/config/app.toml`
    when the browser uses a different origin.
 4. Create writable, persistent directories `backend/data/` and
    `backend/data/assets/`. They are runtime data and must be backed up together.
@@ -47,15 +49,15 @@ The Compose file runs three services:
 Prepare the private config and persistent directories, then start the stack:
 
 ```bash
-cp backend/config/app.local.production.example.toml backend/config/app.local.toml
+cp backend/config/app.local.production.example.toml backend/config/app.toml
 mkdir -p docker-data/backend docker-data/nginx/logs
 docker compose up -d --build
 ```
 
-The Compose bind mount must target only
-`/app/backend/config/app.local.toml:ro`. Do not bind-mount the whole
-`/app/backend/config/` directory, because that hides the image's
-`app.production.toml` defaults.
+The Compose bind mount uses the whole host-private `backend/config/` directory,
+and the container entry point reads `app.toml` from that directory. The file
+must exist before `docker compose up`; the image's `app.production.toml` is the
+copy source, not a fallback after the directory is mounted.
 
 The backend bind mount `docker-data/backend:/app/backend/data` persists the SQLite
 database and uploaded/generated assets. Never put this directory in the image or

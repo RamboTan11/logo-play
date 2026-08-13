@@ -9,10 +9,17 @@ from src.main import create_application
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PRODUCTION_CONFIG_PATH = PROJECT_ROOT / "backend" / "config" / "app.production.toml"
+CONFIG_DIR = PROJECT_ROOT / "backend" / "config"
+
+
+def docker_config_path() -> Path:
+    """Prefer the operator-mounted app.toml, with the repository default as fallback."""
+
+    app_config = CONFIG_DIR / "app.toml"
+    return app_config if app_config.is_file() else CONFIG_DIR / "app.production.toml"
 
 
 def create_app() -> FastAPI:
     """Create the API with production settings without serving the frontend."""
 
-    return create_application(load_settings(PRODUCTION_CONFIG_PATH))
+    return create_application(load_settings(docker_config_path()))

@@ -1,5 +1,6 @@
 """FastAPI application entry point for local backend development."""
 
+import logging
 from typing import cast
 
 from fastapi import FastAPI
@@ -20,10 +21,14 @@ from src.core.development_seed import DevelopmentSeedRegistry
 from src.db.migrations.runner import initialize_database
 from src.db.session import create_database_runtime
 from src.services.lark_worker import LarkWorker
+from src.services.lark_secret_service import LarkSecretService
+from src.services.model_secret_service import ModelConnectionSecretService
 from src.services.single_image_edit_service import SingleImageEditService
 
 from pycore.api import APIConfig, APIServer
 from pycore.core import Logger, LoggerConfig
+
+logger = logging.getLogger(__name__)
 
 
 def create_application(settings: AppSettings | None = None) -> FastAPI:
@@ -53,19 +58,24 @@ def create_application(settings: AppSettings | None = None) -> FastAPI:
     @server.on_startup
     async def initialize_application_database() -> None:
         await initialize_database(application.state.database_runtime, active_settings)
-        if active_settings.model_connection_secret_encryption_key:
-            application.state.single_image_edit_service = SingleImageEditService(
-                application.state.database_runtime,
-                active_settings.asset_root,
-                active_settings.model_connection_secret_encryption_key,
-                provider=getattr(application.state, "single_image_edit_provider", None),
-            )
+        application.state.single_image_edit_service = SingleImageEditService(
+            application.state.database_runtime,
+            active_settings.asset_root,
+            active_settings.model_connection_secret_encryption_key,
+            provider=getattr(application.state, "single_image_edit_provider", None),
+        )
+        if ModelConnectionSecretService(active_settings.model_connection_secret_encryption_key).is_configured:
             await application.state.single_image_edit_service.resume_pending()
-        if active_settings.lark_worker_enabled and active_settings.lark_config_encryption_key:
+        else:
+            logger.warning("Model secret encryption is not configured; generation remains unavailable until configured in admin.")
+        lark_secret_ready = LarkSecretService(active_settings.lark_config_encryption_key).is_configured
+        if active_settings.lark_worker_enabled and lark_secret_ready:
             application.state.lark_worker = LarkWorker(
                 application.state.database_runtime, active_settings
             )
             application.state.lark_worker.start()
+        elif active_settings.lark_worker_enabled:
+            logger.warning("Lark encryption is not configured; Lark worker remains disabled until configured in admin.")
 
     @server.on_shutdown
     async def dispose_application_database() -> None:

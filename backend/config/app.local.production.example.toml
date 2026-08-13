@@ -1,25 +1,28 @@
-# Copy to backend/config/app.local.toml on the production host only.
-# This file intentionally contains no real values and is safe to commit.
-# Generate independent Fernet-compatible keys for a new production environment:
-# python3 deploy/generate-production-secrets.py
-
-# First startup creates this administrator when no shared administrator exists.
+# Complete production file example. Copy to backend/config/app.toml when the
+# host mounts the whole config directory. This file is safe to commit because
+# it contains no real credentials.
+app_title = "Logo Generated API"
+api_version = "0.1.0"
+debug = false
+app_env = "production"
+enable_development_seeds = false
+cors_origins = []
+development_admin_id = "dev-admin-001"
+development_admin_token = "disabled-in-production"
+development_customer_id = "dev-customer-001"
+development_customer_access_link = "disabled-in-production"
+database_path = "data/logo_generated.db"
+asset_root = "data/assets"
+customer_frontend_base_url = "https://app.example.com"
+admin_frontend_base_url = "https://app.example.com"
+lark_worker_enabled = true
+lark_worker_interval_seconds = 5
+lark_delivery_max_attempts = 3
+lark_claim_lease_seconds = 60
+enable_real_model_smoke_tests = true
 initial_admin_username = "CHANGE_ME"
 initial_admin_password = "CHANGE_ME"
-
-# Do not reuse any local-development key. Changing either encryption key after
-# storing credentials in the database makes existing encrypted values unreadable.
 auth_session_secret = "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
 customer_access_token_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
 model_connection_secret_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
 lark_config_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
-
-# The externally reachable HTTPS origin only, without a Markdown wrapper,
-# path, query, or fragment. This project serves the SPA and API from one
-# origin, so both values normally use the same URL.
-customer_frontend_base_url = "https://app.example.com"
-admin_frontend_base_url = "https://app.example.com"
-
-# The admin connectivity button runs a controlled real image-to-image request.
-# Set false only when the deployment must forbid all provider smoke tests.
-enable_real_model_smoke_tests = true

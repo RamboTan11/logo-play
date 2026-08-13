@@ -1,19 +1,27 @@
-# Copy to backend/config/app.local.preprod.toml for pre-production verification only.
-# Create new values; never copy development or production secrets into this file.
-
+# Complete pre-production configuration example. Copy to the host-private
+# backend/config/app.toml when validating with Docker on a loopback address.
+app_title = "Logo Generated API"
+api_version = "0.1.0"
+debug = false
 app_env = "preproduction"
-initial_admin_username = "preprod-admin"
-initial_admin_password = "CHANGE_ME"
-
-# Generate independent values for this environment.
-auth_session_secret = "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
-customer_access_token_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
-model_connection_secret_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
-lark_config_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
-
-# Keep a local testing address unless testing a pre-production domain.
+enable_development_seeds = false
+cors_origins = ["http://127.0.0.1:18080", "http://localhost:18080"]
+development_admin_id = "dev-admin-001"
+development_admin_token = "disabled-in-preproduction"
+development_customer_id = "dev-customer-001"
+development_customer_access_link = "disabled-in-preproduction"
+database_path = "data/logo_generated.db"
+asset_root = "data/assets"
 customer_frontend_base_url = "http://127.0.0.1:18080"
 admin_frontend_base_url = "http://127.0.0.1:18080"
-
-# A pre-production test should not notify real Lark recipients by default.
+lark_worker_enabled = false
+lark_worker_interval_seconds = 5
+lark_delivery_max_attempts = 3
+lark_claim_lease_seconds = 60
 enable_real_model_smoke_tests = true
+initial_admin_username = "CHANGE_ME"
+initial_admin_password = "CHANGE_ME"
+auth_session_secret = ""
+customer_access_token_encryption_key = ""
+model_connection_secret_encryption_key = ""
+lark_config_encryption_key = ""
