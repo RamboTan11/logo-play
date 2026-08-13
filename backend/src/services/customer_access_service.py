@@ -350,8 +350,9 @@ class CustomerAccessService:
         parsed = urlsplit(value)
         is_development = self.settings.app_env.strip().lower() == "development"
         loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        is_preproduction = self.settings.app_env.strip().lower() == "preproduction"
         valid_scheme = parsed.scheme == "https" or (
-            is_development and parsed.scheme == "http" and loopback
+            (is_development or is_preproduction) and parsed.scheme == "http" and loopback
         )
         if (
             not value

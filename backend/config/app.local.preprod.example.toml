@@ -1,6 +1,7 @@
 # Copy to backend/config/app.local.preprod.toml for pre-production verification only.
 # Create new values; never copy development or production secrets into this file.
 
+app_env = "preproduction"
 initial_admin_username = "preprod-admin"
 initial_admin_password = "CHANGE_ME"
 

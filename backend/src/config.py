@@ -42,6 +42,7 @@ class PrivateSettings(PyCoreBaseSettings):
     """Only the untracked deployment-local values needed by the application."""
 
     model_connection_secret_encryption_key: str | None = None
+    app_env: str | None = None
     enable_real_model_smoke_tests: bool | None = None
     initial_admin_username: str | None = None
     initial_admin_password: str | None = None
