@@ -109,6 +109,7 @@ Docker 后端入口固定读取 `backend/config/app.production.toml`，并自动
 - `app_env = "production"`
 - `debug = false`
 - `enable_development_seeds = false`
+- `enable_real_model_smoke_tests = true`（管理后台连通性测试需要；每次测试可能消耗供应商额度）
 - `VITE_USE_MOCK=false`
 
 ## 不应进入仓库的内容

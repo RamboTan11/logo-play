@@ -6,6 +6,7 @@ backend/data
 backend/logs
 backend/tests
 backend/config/app.local.toml
+backend/config/app.local.preprod.toml
 backend/config/app.toml
 backend/config/app.example.toml
 frontend/node_modules

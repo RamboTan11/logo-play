@@ -2,6 +2,8 @@
 .env.*
 !.env.example
 backend/config/app.local.toml
+backend/config/app.local.preprod.toml
+.env.preprod
 # Runtime business data is provisioned on the deployment host and backed up there.
 # Never commit local customers, generated images, provider secrets encrypted with a
 # deployment-specific key, or smoke-test diagnostics.

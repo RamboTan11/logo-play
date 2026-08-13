@@ -18,5 +18,6 @@ lark_config_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
 customer_frontend_base_url = "https://app.example.com"
 admin_frontend_base_url = "https://app.example.com"
 
-# Keep disabled unless a controlled production smoke test is explicitly needed.
-enable_real_model_smoke_tests = false
+# The admin connectivity button runs a controlled real image-to-image request.
+# Set false only when the deployment must forbid all provider smoke tests.
+enable_real_model_smoke_tests = true

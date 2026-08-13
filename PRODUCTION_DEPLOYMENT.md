@@ -20,6 +20,8 @@ model credentials, Lark secrets, local runtime logs, SDD records, or test suites
 2. Copy `backend/config/app.local.production.example.toml` to
    `backend/config/app.local.toml`, then replace every `CHANGE_ME` value through
    the server secret manager or another host-private mechanism. Do not commit it.
+   Keep `enable_real_model_smoke_tests = true` when administrators need to run the
+   real provider connectivity test; each test can consume provider quota.
 3. Set `customer_frontend_base_url` and `admin_frontend_base_url` to the final
    HTTPS domain. Update `cors_origins` in `backend/config/app.production.toml`
    when the browser uses a different origin.

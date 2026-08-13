@@ -1,0 +1,18 @@
+# Copy to backend/config/app.local.preprod.toml for pre-production verification only.
+# Create new values; never copy development or production secrets into this file.
+
+initial_admin_username = "preprod-admin"
+initial_admin_password = "CHANGE_ME"
+
+# Generate independent values for this environment.
+auth_session_secret = "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+customer_access_token_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+model_connection_secret_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+lark_config_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+
+# Keep a local testing address unless testing a pre-production domain.
+customer_frontend_base_url = "http://127.0.0.1:18080"
+admin_frontend_base_url = "http://127.0.0.1:18080"
+
+# A pre-production test should not notify real Lark recipients by default.
+enable_real_model_smoke_tests = true

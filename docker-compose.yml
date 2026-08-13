@@ -6,8 +6,8 @@ services:
     ports:
       - "${BACKEND_PORT:-8099}:8099"
     volumes:
-      - ./docker-data/backend:/app/backend/data
-      - ./backend/config/app.local.toml:/app/backend/config/app.local.toml:ro
+      - ${RUNTIME_DATA_DIR:-./docker-data/backend}:/app/backend/data
+      - ${BACKEND_LOCAL_CONFIG:-./backend/config/app.local.toml}:/app/backend/config/app.local.toml:ro
     environment:
       PYTHONUNBUFFERED: "1"
     restart: unless-stopped
@@ -41,5 +41,5 @@ services:
       - "${HTTP_PORT:-80}:80"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker-data/nginx/logs:/var/log/nginx
+      - ${NGINX_LOG_DIR:-./docker-data/nginx/logs}:/var/log/nginx
     restart: unless-stopped

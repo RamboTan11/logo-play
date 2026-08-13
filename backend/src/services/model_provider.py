@@ -31,6 +31,11 @@ _KIE_POLL_ATTEMPTS = 60
 _KIE_POLL_INTERVAL_SECONDS = 2.0
 PROMPT_OPTIMIZATION_STATUS = "upstream_not_configurable"
 KIE_GPT_IMAGE_MODEL_ID = "gpt-image-2"
+KIE_GPT_IMAGE_MODEL_ALIASES = {
+    KIE_GPT_IMAGE_MODEL_ID,
+    _KIE_TEXT_TO_IMAGE_MODEL,
+    _KIE_IMAGE_TO_IMAGE_MODEL,
+}
 _JPEG_SOF_MARKERS = frozenset(
     {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
 )
@@ -653,7 +658,7 @@ def image_provider_for_connection(
     normalized_provider = provider.strip().casefold()
     normalized_model = model_id.strip().casefold()
     if normalized_provider == "kie":
-        if normalized_model != KIE_GPT_IMAGE_MODEL_ID:
+        if normalized_model not in KIE_GPT_IMAGE_MODEL_ALIASES:
             raise ProviderError("unsupported_model", "Unsupported Kie image model")
         return KieGptImageProvider()
     if normalized_provider in {"火山方舟", "volcengine", "doubao", "volcano engine"}:
@@ -668,7 +673,7 @@ def provider_adapter_name(provider: str, model_id: str) -> str:
 
     if (
         provider.strip().casefold() == "kie"
-        and model_id.strip().casefold() == KIE_GPT_IMAGE_MODEL_ID
+        and model_id.strip().casefold() in KIE_GPT_IMAGE_MODEL_ALIASES
     ):
         return "kie_gpt_image_2"
     return "doubao_seedream"
@@ -677,7 +682,7 @@ def provider_adapter_name(provider: str, model_id: str) -> str:
 def fixed_rendering_metadata(model_id: str = "") -> dict[str, str | int | bool]:
     """Return the safe, non-overridable rendering contract for audit summaries."""
 
-    if model_id.strip().casefold() == KIE_GPT_IMAGE_MODEL_ID:
+    if model_id.strip().casefold() in KIE_GPT_IMAGE_MODEL_ALIASES:
         return {
             "adapter_profile": "kie_gpt_image_2",
             "max_input_images": 9,
@@ -701,7 +706,7 @@ def fixed_rendering_metadata(model_id: str = "") -> dict[str, str | int | bool]:
 def is_valid_native_output(image: bytes, media_type: str | None, model_id: str = "") -> bool:
     """Validate the fixed business output contract before it is persisted."""
 
-    if model_id.strip().casefold() == KIE_GPT_IMAGE_MODEL_ID:
+    if model_id.strip().casefold() in KIE_GPT_IMAGE_MODEL_ALIASES:
         return media_type in {"image/png", "image/jpeg"} and _is_square_native_image(
             image, media_type
         )
@@ -765,7 +770,7 @@ def _validated_reference_pairs(
 
 
 def _validate_kie_configuration(api_url: str, model_id: str) -> None:
-    if model_id.strip().casefold() != KIE_GPT_IMAGE_MODEL_ID:
+    if model_id.strip().casefold() not in KIE_GPT_IMAGE_MODEL_ALIASES:
         raise ProviderError("unsupported_model", "Unsupported Kie image model")
     if api_url.rstrip("/") != _KIE_CREATE_TASK_URL:
         raise ProviderError("invalid_provider_url", "Kie task creation URL is invalid")
