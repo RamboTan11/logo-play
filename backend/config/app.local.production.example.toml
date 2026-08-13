@@ -1,0 +1,22 @@
+# Copy to backend/config/app.local.toml on the production host only.
+# This file intentionally contains no real values and is safe to commit.
+# Generate independent Fernet-compatible keys for a new production environment.
+
+# First startup creates this administrator when no shared administrator exists.
+initial_admin_username = "CHANGE_ME"
+initial_admin_password = "CHANGE_ME"
+
+# Do not reuse any local-development key. Changing either encryption key after
+# storing credentials in the database makes existing encrypted values unreadable.
+auth_session_secret = "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+customer_access_token_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+model_connection_secret_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+lark_config_encryption_key = "CHANGE_ME_TO_A_FERNET_KEY"
+
+# The externally reachable HTTPS origin. This project serves the SPA and API
+# from one origin, so both values normally use the same URL.
+customer_frontend_base_url = "https://app.example.com"
+admin_frontend_base_url = "https://app.example.com"
+
+# Keep disabled unless a controlled production smoke test is explicitly needed.
+enable_real_model_smoke_tests = false

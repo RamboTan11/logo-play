@@ -1,0 +1,27 @@
+# Public production settings. Secrets remain in the untracked app.local.toml.
+app_title = "Logo Generated API"
+api_version = "0.1.0"
+debug = false
+app_env = "production"
+enable_development_seeds = false
+cors_origins = [
+  "http://localhost:5199",
+  "http://127.0.0.1:5199",
+  "http://localhost:5175",
+  "http://127.0.0.1:5175",
+]
+
+# Development identities are required by the shared settings schema but are
+# disabled whenever app_env is not development.
+development_admin_id = "dev-admin-001"
+development_admin_token = "disabled-in-production"
+development_customer_id = "dev-customer-001"
+development_customer_access_link = "disabled-in-production"
+
+database_path = "data/logo_generated.db"
+asset_root = "data/assets"
+admin_frontend_base_url = "http://127.0.0.1:8099"
+lark_worker_enabled = true
+lark_worker_interval_seconds = 5
+lark_delivery_max_attempts = 3
+lark_claim_lease_seconds = 60

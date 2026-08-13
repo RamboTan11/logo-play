@@ -1,0 +1,39 @@
+.env
+.env.*
+!.env.example
+backend/config/app.local.toml
+# Runtime business data is provisioned on the deployment host and backed up there.
+# Never commit local customers, generated images, provider secrets encrypted with a
+# deployment-specific key, or smoke-test diagnostics.
+backend/data/*.db
+backend/data/*.db-*
+backend/data/*.sqlite
+backend/data/*.sqlite-*
+backend/data/assets/
+backend/data/controlled-smoke-diagnostics/
+
+# SDD work records and executable test suites are not part of the production delivery.
+.sdd/
+backend/tests/
+frontend/tests/
+frontend/scripts/upload-delay-proxy.mjs
+
+# These are local planning, test, and SDD-harness materials, not runtime inputs.
+AGENTS.md
+README.md
+docs/
+backend/config/app.toml
+backend/config/app.example.toml
+.venv-win/
+.venv/
+.venv-macos/
+deploy/runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+node_modules/
+dist/
+build/
+.DS_Store
+logs/
