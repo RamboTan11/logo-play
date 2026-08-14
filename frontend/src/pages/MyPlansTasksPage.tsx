@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientShell } from '../components/ClientShell'
+import { CachedImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { adoptLogo, getMyTask, getMyTasks } from '../services/designTasksService'
 import { getSavedLogos } from '../services/savedLogosService'
@@ -65,7 +66,7 @@ function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked }: {
   const tooltipId = 'saved-logo-adopt-lock-' + logo.id
   return (
     <article className="saved-logo-card" tabIndex={-1}>
-      <div className="saved-logo-image"><img src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} /></div>
+      <div className="saved-logo-image"><CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} /></div>
       <div className="saved-logo-card-copy"><b>{t('已收藏方案')}</b><span>{logo.domain}</span></div>
       <div className="saved-logo-card-actions">
         <button className="secondary" type="button" aria-label={t('编辑') + ' ' + logo.domain + ' ' + t('收藏方案')} onClick={onEdit}>{t('编辑')}</button>
@@ -87,7 +88,7 @@ function TaskThumbnail({ src, alt, onPreview }: {
   if (!src) return <span className="my-task-empty-cell">-</span>
   return (
     <button className="my-task-image-button" type="button" aria-label={t('预览') + ' ' + alt} onClick={() => onPreview(src, alt)}>
-      <img src={src} alt={alt} />
+      <CachedImage src={src} alt={alt} />
     </button>
   )
 }
@@ -128,7 +129,7 @@ function TaskRow({
 }
 
 function TaskImage({ src, alt }: { src: string; alt: string }) {
-  return <div className="client-task-snapshot-image"><img src={src} alt={alt} /></div>
+  return <div className="client-task-snapshot-image"><CachedImage src={src} alt={alt} loading="eager" /></div>
 }
 
 function DeliveryPendingPreview() {
@@ -184,7 +185,7 @@ function ImagePreviewModal({ src, alt, onClose }: { src: string; alt: string; on
     <div className="my-task-image-preview" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="my-task-image-preview-dialog" role="dialog" aria-modal="true" aria-label={alt}>
         <button ref={closeButtonRef} className="my-task-image-preview-close" type="button" aria-label={t('关闭图片预览')} onClick={onClose}>×</button>
-        <img src={src} alt={alt} />
+        <CachedImage src={src} alt={alt} loading="eager" />
       </section>
     </div>
   )

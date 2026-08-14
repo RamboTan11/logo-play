@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ClientShell } from '../components/ClientShell'
+import { CachedImage } from '../components/CachedImage'
 import { getMyTask } from '../services/designTasksService'
 import { useToastStore } from '../stores/useToastStore'
 import type { MyTaskDetail } from '../types/api'
@@ -36,7 +37,7 @@ export function MyTaskDetailPage() {
         <button className="task-back" type="button" onClick={() => navigate('/my-plans')}>← {t('返回我的方案')}</button>
         <header className="task-detail-head"><h1 className="display">{task.domain}</h1></header>
         <section className="customer-task-detail-layout">
-          <article className="task-detail-adopted"><h2>{t('方案详情')}</h2><div className="task-detail-snapshots"><section><h3>{t('选择方案')}</h3><img src={task.adopted_image_url} alt={t('选择方案')} /></section><section><h3>{t('精修终稿')}</h3>{task.delivery_image_url ? <img src={task.delivery_image_url} alt={t('精修终稿')} /> : <div className="client-task-delivery-pending" role="img" aria-label={t('精修终稿待交付')}><span>{t('待交付')}</span></div>}</section></div></article>
+          <article className="task-detail-adopted"><h2>{t('方案详情')}</h2><div className="task-detail-snapshots"><section><h3>{t('选择方案')}</h3><CachedImage src={task.adopted_image_url} alt={t('选择方案')} loading="eager" /></section><section><h3>{t('精修终稿')}</h3>{task.delivery_image_url ? <CachedImage src={task.delivery_image_url} alt={t('精修终稿')} loading="eager" /> : <div className="client-task-delivery-pending" role="img" aria-label={t('精修终稿待交付')}><span>{t('待交付')}</span></div>}</section></div></article>
           <aside className="task-detail-info"><h2>{t('人工精修建议')}</h2><div><b>{displayEmpty(task.adoption_suggestion)}</b></div></aside>
         </section>
       </main>

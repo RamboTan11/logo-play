@@ -5,6 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { GenerationWaitingState } from '../components/GenerationWaitingState'
+import { CachedImage } from '../components/CachedImage'
 import { LogoArtwork } from '../components/LogoArtwork'
 import { adoptLogo } from '../services/designTasksService'
 import { saveLogo } from '../services/savedLogosService'
@@ -164,7 +165,7 @@ export function GenerationResultsPage() {
                   return <article className={'result-card ' + (selected ? 'selected' : '')} key={option.id}>
                     <button className="result-select-control" aria-label={t('选择方案')} disabled={isRegenerating} onClick={() => setSelectedId(option.id)} />
                     <button className="result-edit-icon" aria-label={t('单图编辑')} title={t('单图编辑')} disabled={isRegenerating} onClick={(event) => { event.stopPropagation(); navigate('/edit/' + encodeURIComponent(option.id)) }}>✎</button>
-                    {option.imageUrl ? <img className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} /> : <LogoArtwork variant={index + (batch.request_id.length % 6)} domain={batch.domain} />}
+                    {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} /> : <LogoArtwork variant={index + (batch.request_id.length % 6)} domain={batch.domain} />}
                   </article>
                 })}
               </section>

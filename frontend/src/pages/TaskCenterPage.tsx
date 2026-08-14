@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Upload, UserCheck } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminNavigation } from '../components/AdminNavigation'
+import { CachedImage } from '../components/CachedImage'
 import { GlobalToast } from '../components/GlobalToast'
 import {
   acceptTask,
@@ -88,8 +89,8 @@ function TaskDetailModal({ task, isBusy, onAccept, onClose, onDownload, onUpload
       <div className="task-detail-body">
         <div className="task-detail-facts"><div className="task-detail-fact"><span>客户名称</span><b>{task.customer_name}</b></div><div className="task-detail-fact"><span>当前状态</span><b>{labels[task.status]}</b></div></div>
         <div className="task-detail-images">
-          <article className="task-detail-image"><div className="task-detail-image-head"><h3>选择方案</h3><button type="button" disabled={isDownloading} aria-label="下载选择方案" title="下载选择方案" onClick={() => { setIsDownloading(true); void onDownload().finally(() => setIsDownloading(false)) }}><Download size={15} aria-hidden="true" /></button></div><div className="task-detail-image-frame"><img src={task.adopted_image_url} alt="选择方案" draggable title="可拖动图片到支持的应用" onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy' }} /></div></article>
-          <article className="task-detail-image"><div className="task-detail-image-head"><h3>精修终稿</h3></div>{task.delivery_image_url ? <div className="task-detail-image-frame"><img src={task.delivery_image_url} alt="精修终稿" /></div> : <DeliveryPendingPreview />}</article>
+          <article className="task-detail-image"><div className="task-detail-image-head"><h3>选择方案</h3><button type="button" disabled={isDownloading} aria-label="下载选择方案" title="下载选择方案" onClick={() => { setIsDownloading(true); void onDownload().finally(() => setIsDownloading(false)) }}><Download size={15} aria-hidden="true" /></button></div><div className="task-detail-image-frame"><CachedImage src={task.adopted_image_url} alt="选择方案" draggable title="可拖动图片到支持的应用" loading="eager" onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy' }} /></div></article>
+          <article className="task-detail-image"><div className="task-detail-image-head"><h3>精修终稿</h3></div>{task.delivery_image_url ? <div className="task-detail-image-frame"><CachedImage src={task.delivery_image_url} alt="精修终稿" loading="eager" /></div> : <DeliveryPendingPreview />}</article>
         </div>
         <div className="task-detail-texts"><div className="task-detail-text"><span>人工精修建议</span><b>{empty(task.adoption_suggestion)}</b></div></div>
       </div>
