@@ -11,14 +11,28 @@ interface AdminAuthState {
   logout: () => Promise<void>
 }
 
+let sessionCheckPromise: Promise<boolean> | null = null
+
+function requestAdminSession(): Promise<boolean> {
+  if (!sessionCheckPromise) {
+    sessionCheckPromise = getAdminSession().finally(() => {
+      sessionCheckPromise = null
+    })
+  }
+  return sessionCheckPromise
+}
+
 export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
   status: 'unknown',
   authorize: () => set({ status: 'authorized' }),
   invalidate: () => set({ status: 'unauthorized' }),
   checkSession: async () => {
-    if (get().status === 'checking') return
+    if (get().status === 'checking' && sessionCheckPromise) {
+      await sessionCheckPromise
+      return
+    }
     set({ status: 'checking' })
-    set({ status: (await getAdminSession()) ? 'authorized' : 'unauthorized' })
+    set({ status: (await requestAdminSession()) ? 'authorized' : 'unauthorized' })
   },
   logout: async () => {
     try {

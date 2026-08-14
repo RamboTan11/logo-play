@@ -213,6 +213,9 @@ class TaskCenterService:
 
         now = datetime.now(UTC)
         stored = self._storage.write(upload.content, upload.media_type)
+        # Delivery must remain successful even if the optional preview cannot
+        # be generated. Historical assets still use the guarded lazy fallback.
+        self._storage.write_thumbnail(stored.storage_key, upload.content)
         asset = AssetRecord(
             asset_id=stored.asset_id,
             purpose=TASK_DELIVERY_IMAGE_PURPOSE,

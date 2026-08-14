@@ -28,12 +28,21 @@ type CachedImageProps = Omit<ComponentPropsWithoutRef<'img'>, 'src' | 'loading'>
 }
 
 /** Cache authenticated API images for the current tab and defer off-screen requests. */
-export function CachedImage({ src, loading = 'lazy', thumbnail = false, ...props }: CachedImageProps) {
+export function CachedImage({
+  src,
+  loading = 'lazy',
+  thumbnail = false,
+  className,
+  onLoad,
+  onError,
+  ...props
+}: CachedImageProps) {
   const requestedSrc = thumbnail && src.includes('/api/')
     ? `${src}${src.includes('?') ? '&' : '?'}thumbnail=true`
     : src
   const imageRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(loading === 'eager')
+  const [loaded, setLoaded] = useState(false)
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(() => (
     requestedSrc.includes('/api/') ? null : requestedSrc
   ))
@@ -41,6 +50,7 @@ export function CachedImage({ src, loading = 'lazy', thumbnail = false, ...props
   useEffect(() => {
     setResolvedSrc(requestedSrc.includes('/api/') ? null : requestedSrc)
     setShouldLoad(loading === 'eager')
+    setLoaded(false)
   }, [requestedSrc, loading])
 
   useEffect(() => {
@@ -68,5 +78,19 @@ export function CachedImage({ src, loading = 'lazy', thumbnail = false, ...props
     return () => { active = false }
   }, [shouldLoad, requestedSrc])
 
-  return <img ref={imageRef} src={resolvedSrc ?? undefined} {...props} />
+  return <img
+    ref={imageRef}
+    src={resolvedSrc ?? undefined}
+    className={`cached-image${loaded ? ' is-loaded' : ''}${className ? ` ${className}` : ''}`}
+    aria-busy={!loaded}
+    onLoad={(event) => {
+      setLoaded(true)
+      onLoad?.(event)
+    }}
+    onError={(event) => {
+      setLoaded(true)
+      onError?.(event)
+    }}
+    {...props}
+  />
 }

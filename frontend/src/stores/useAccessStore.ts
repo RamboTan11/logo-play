@@ -14,7 +14,16 @@ interface AccessState {
   checkSession: (options?: { silent?: boolean }) => Promise<void>
 }
 
-let sessionCheckPending = false
+let sessionCheckPromise: Promise<boolean> | null = null
+
+function requestCustomerSession(): Promise<boolean> {
+  if (!sessionCheckPromise) {
+    sessionCheckPromise = getCustomerSession().finally(() => {
+      sessionCheckPromise = null
+    })
+  }
+  return sessionCheckPromise
+}
 
 export const useAccessStore = create<AccessState>((set, get) => ({
   status: 'unknown',
@@ -32,15 +41,15 @@ export const useAccessStore = create<AccessState>((set, get) => ({
     set({ status: 'unauthorized' })
   },
   checkSession: async ({ silent = false } = {}) => {
-    if (sessionCheckPending || get().status === 'checking') return
-    sessionCheckPending = true
+    if (get().status === 'checking' && sessionCheckPromise) {
+      await sessionCheckPromise
+      return
+    }
     if (!silent) set({ status: 'checking' })
     try {
-      set({ status: (await getCustomerSession()) ? 'authorized' : 'unauthorized' })
+      set({ status: (await requestCustomerSession()) ? 'authorized' : 'unauthorized' })
     } catch {
       if (!silent) set({ status: 'unauthorized' })
-    } finally {
-      sessionCheckPending = false
     }
   },
 }))

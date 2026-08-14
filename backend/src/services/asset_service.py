@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
@@ -37,6 +38,9 @@ class StoredAsset:
 class LocalFallbackAssetStorage:
     """Store generated keys beneath the configured server-owned asset root."""
 
+    _thumbnail_locks: dict[str, Lock] = {}
+    _thumbnail_locks_guard = Lock()
+
     def __init__(self, configured_root: str) -> None:
         self.root: Path = resolve_backend_path(configured_root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -62,28 +66,63 @@ class LocalFallbackAssetStorage:
     def read_thumbnail(self, storage_key: str, original: bytes) -> bytes:
         """Return a persisted WebP preview, deriving it locally on first request."""
 
-        target = self._path_for_key(f"{storage_key}.thumb.webp")
+        target = self._thumbnail_path(storage_key)
         if target.is_file():
             return target.read_bytes()
-        try:
-            with Image.open(BytesIO(original)) as image:
-                image.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS)
-                output = BytesIO()
-                image.save(output, format="WEBP", quality=80, method=6)
-                thumbnail = output.getvalue()
-        except (OSError, UnidentifiedImageError, ValueError) as error:
-            raise ValueError("Unable to create image thumbnail") from error
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(thumbnail)
-        return thumbnail
+        lock = self._thumbnail_lock(storage_key)
+        with lock:
+            if target.is_file():
+                return target.read_bytes()
+            thumbnail = self._build_thumbnail(original)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(thumbnail)
+            return thumbnail
+
+    def write_thumbnail(self, storage_key: str, original: bytes) -> bool:
+        """Best-effort thumbnail generation that never blocks an asset write."""
+
+        target = self._thumbnail_path(storage_key)
+        if target.is_file():
+            return True
+        lock = self._thumbnail_lock(storage_key)
+        with lock:
+            if target.is_file():
+                return True
+            try:
+                thumbnail = self._build_thumbnail(original)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(thumbnail)
+            except (OSError, UnidentifiedImageError, ValueError):
+                return False
+        return True
 
     def delete(self, storage_key: str) -> None:
         """Remove an uncommitted staged file after a rejected state transition."""
 
         try:
             self._path_for_key(storage_key).unlink(missing_ok=True)
+            self._thumbnail_path(storage_key).unlink(missing_ok=True)
         except OSError:
             return
+
+    def _thumbnail_path(self, storage_key: str) -> Path:
+        return self._path_for_key(f"{storage_key}.thumb.webp")
+
+    @staticmethod
+    def _build_thumbnail(original: bytes) -> bytes:
+        try:
+            with Image.open(BytesIO(original)) as image:
+                image.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS)
+                output = BytesIO()
+                image.save(output, format="WEBP", quality=80, method=6)
+                return output.getvalue()
+        except (OSError, UnidentifiedImageError, ValueError) as error:
+            raise ValueError("Unable to create image thumbnail") from error
+
+    @classmethod
+    def _thumbnail_lock(cls, storage_key: str) -> Lock:
+        with cls._thumbnail_locks_guard:
+            return cls._thumbnail_locks.setdefault(storage_key, Lock())
 
     def _path_for_key(self, storage_key: str) -> Path:
         candidate: Path = Path(self.root / storage_key).resolve()
@@ -196,6 +235,9 @@ class AssetService:
         if media_type not in {"image/png", "image/jpeg"}:
             raise ValueError("Generated Logo must be PNG or JPEG")
         stored = self._storage.write(content, media_type)
+        # A thumbnail is an optimization only. A malformed provider response
+        # must not turn a successful original-image write into a failed job.
+        self._storage.write_thumbnail(stored.storage_key, content)
         record = AssetRecord(
             asset_id=stored.asset_id,
             purpose=GENERATED_LOGO_PURPOSE,
