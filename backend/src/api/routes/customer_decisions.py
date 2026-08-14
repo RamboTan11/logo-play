@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import require_customer_session
@@ -95,10 +95,11 @@ async def get_saved_logo_image(
     principal: CustomerDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     try:
         media_type, content = await service.read_saved_logo(
-            session, principal.id, saved_logo_id
+            session, principal.id, saved_logo_id, thumbnail=thumbnail
         )
     except CustomerDecisionError as error:
         return _error_response(error)
@@ -161,9 +162,10 @@ async def get_my_task_adopted_image(
     principal: CustomerDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     return await _task_image_response(
-        task_id, principal, session, service, initial=False
+        task_id, principal, session, service, initial=False, thumbnail=thumbnail
     )
 
 
@@ -173,9 +175,10 @@ async def get_my_task_initial_image(
     principal: CustomerDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     return await _task_image_response(
-        task_id, principal, session, service, initial=True
+        task_id, principal, session, service, initial=True, thumbnail=thumbnail
     )
 
 
@@ -185,10 +188,11 @@ async def get_my_task_delivery_image(
     principal: CustomerDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     try:
         media_type, content = await service.read_task_delivery_image(
-            session, principal.id, task_id
+            session, principal.id, task_id, thumbnail=thumbnail
         )
     except CustomerDecisionError as error:
         return _error_response(error)
@@ -206,10 +210,11 @@ async def _task_image_response(
     service: CustomerDecisionService,
     *,
     initial: bool,
+    thumbnail: bool,
 ) -> Response | JSONResponse:
     try:
         media_type, content = await service.read_task_image(
-            session, principal.id, task_id, initial=initial
+        session, principal.id, task_id, initial=initial, thumbnail=thumbnail
         )
     except CustomerDecisionError as error:
         return _error_response(error)

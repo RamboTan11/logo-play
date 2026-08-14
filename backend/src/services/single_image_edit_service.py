@@ -409,7 +409,9 @@ class SingleImageEditService:
                 versions=await self._version_dtos(session, versions),
             )
 
-    async def read_version_image(self, customer_id: str, logo_version_id: str) -> tuple[str, bytes]:
+    async def read_version_image(
+        self, customer_id: str, logo_version_id: str, *, thumbnail: bool = False
+    ) -> tuple[str, bytes]:
         async with get_db_context(self._runtime) as session:
             version = await session.get(LogoVersion, logo_version_id)
             if version is None or version.customer_id != customer_id:
@@ -422,8 +424,10 @@ class SingleImageEditService:
                 raise SingleImageEditRequestError(
                     "generation_image_not_found", "生成图片不存在", 404
                 )
-            asset, content = await self._assets.read_generated_logo(session, version.asset_id)
-            return asset.media_type, cast(bytes, content)
+            asset, content = await self._assets.read_generated_logo(
+                session, version.asset_id, thumbnail=thumbnail
+            )
+            return ("image/webp" if thumbnail else asset.media_type), cast(bytes, content)
 
     async def _runtime_policy(
         self, session: AsyncSession, description: str

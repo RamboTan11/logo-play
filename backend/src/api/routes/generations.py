@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, UploadFile, status
 from fastapi import Path as ApiPath
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -284,11 +284,14 @@ async def get_single_image_edit_image(
     logo_version_id: str,
     principal: CustomerDependency,
     service: SingleEditServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     """Read a customer-owned image only while it is in the chain's two-version window."""
 
     try:
-        media_type, content = await service.read_version_image(principal.id, logo_version_id)
+        media_type, content = await service.read_version_image(
+            principal.id, logo_version_id, thumbnail=thumbnail
+        )
     except SingleImageEditRequestError as error:
         return _single_edit_error_response(error)
     return Response(
@@ -333,12 +336,13 @@ async def get_logo_image(
     logo_version_id: str,
     principal: CustomerDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     """Read an image only through a customer-owned two-successful-batch window."""
 
     try:
         media_type, content = await service.read_logo_image(
-            principal.id, window_anchor_request_id, logo_version_id
+            principal.id, window_anchor_request_id, logo_version_id, thumbnail=thumbnail
         )
     except BatchGenerationRequestError as error:
         return _request_error_response(error)

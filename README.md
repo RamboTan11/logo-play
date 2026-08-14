@@ -88,6 +88,10 @@ docker compose ps
 前端容器使用 `docker/frontend.conf` 作为唯一 Nginx 配置，代理 `/api`、`/ws` 和 `/health`，并将其他路径提供给前端 SPA。当前生产构建默认使用 `/generate-logo/` 子路径；宿主机 Nginx 应使用 `location ^~ /generate-logo/` 将请求转发到 `http://127.0.0.1:8098/`，保留 `proxy_pass` 末尾 `/` 以剥离该前缀。容器内配置同时兼容前缀已剥离或原样转发的情况。
 如需 HTTPS，应在该容器前增加云负载均衡、Cloudflare Tunnel 或宿主机 TLS 反向代理，不要再在 Compose 内启动第二个 Nginx。
 
+列表图片使用受保护接口的本地 WebP 缩略图（最大边长 640px）；缩略图首次请求时在
+`docker-data/backend/` 对应素材目录按需生成并持久化。单图编辑、详情和下载继续使用原图，
+历史素材没有缩略图时会自动回退并生成，不需要迁移数据库。
+
 Compose 按当前生产方式只读挂载整个 `backend/config/` 目录；该宿主机目录中必须
 存在完整的 `app.toml`。不要直接挂载空目录，否则容器无法读取配置。
 

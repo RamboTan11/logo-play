@@ -21,6 +21,8 @@ TASK_DELIVERY_IMAGE_PURPOSE = "task_delivery_image"
 LOCAL_FALLBACK = "local_fallback"
 SOURCE_IMAGE_MEDIA_TYPES = {"image/png", "image/jpeg", "image/webp"}
 _SOURCE_IMAGE_FORMATS = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}
+THUMBNAIL_MEDIA_TYPE = "image/webp"
+THUMBNAIL_MAX_EDGE = 640
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +58,24 @@ class LocalFallbackAssetStorage:
         """Read an asset only after proving its generated key stays under the root."""
 
         return self._path_for_key(storage_key).read_bytes()
+
+    def read_thumbnail(self, storage_key: str, original: bytes) -> bytes:
+        """Return a persisted WebP preview, deriving it locally on first request."""
+
+        target = self._path_for_key(f"{storage_key}.thumb.webp")
+        if target.is_file():
+            return target.read_bytes()
+        try:
+            with Image.open(BytesIO(original)) as image:
+                image.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS)
+                output = BytesIO()
+                image.save(output, format="WEBP", quality=80, method=6)
+                thumbnail = output.getvalue()
+        except (OSError, UnidentifiedImageError, ValueError) as error:
+            raise ValueError("Unable to create image thumbnail") from error
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(thumbnail)
+        return thumbnail
 
     def delete(self, storage_key: str) -> None:
         """Remove an uncommitted staged file after a rejected state transition."""
@@ -200,18 +220,19 @@ class AssetService:
         return record
 
     async def read_generated_logo(
-        self, session: AsyncSession, asset_id: str
+        self, session: AsyncSession, asset_id: str, *, thumbnail: bool = False
     ) -> tuple[AssetRecord, bytes]:
         record = await session.get(AssetRecord, asset_id)
         if record is None or record.purpose != GENERATED_LOGO_PURPOSE:
             raise LookupError("Generated Logo not found")
         try:
-            return record, self._storage.read(record.storage_key)
+            content = self._storage.read(record.storage_key)
+            return record, self._storage.read_thumbnail(record.storage_key, content) if thumbnail else content
         except OSError as error:
             raise LookupError("Generated Logo not found") from error
 
     async def read_task_delivery_image(
-        self, session: AsyncSession, asset_id: str
+        self, session: AsyncSession, asset_id: str, *, thumbnail: bool = False
     ) -> tuple[AssetRecord, bytes]:
         """Read one protected delivery image without exposing a storage location."""
 
@@ -219,7 +240,8 @@ class AssetService:
         if record is None or record.purpose != TASK_DELIVERY_IMAGE_PURPOSE:
             raise LookupError("Task delivery image not found")
         try:
-            return record, self._storage.read(record.storage_key)
+            content = self._storage.read(record.storage_key)
+            return record, self._storage.read_thumbnail(record.storage_key, content) if thumbnail else content
         except OSError as error:
             raise LookupError("Task delivery image not found") from error
 

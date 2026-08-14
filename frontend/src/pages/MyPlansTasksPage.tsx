@@ -66,7 +66,7 @@ function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked }: {
   const tooltipId = 'saved-logo-adopt-lock-' + logo.id
   return (
     <article className="saved-logo-card" tabIndex={-1}>
-      <div className="saved-logo-image"><CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} /></div>
+      <div className="saved-logo-image"><CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail /></div>
       <div className="saved-logo-card-copy"><b>{t('已收藏方案')}</b><span>{logo.domain}</span></div>
       <div className="saved-logo-card-actions">
         <button className="secondary" type="button" aria-label={t('编辑') + ' ' + logo.domain + ' ' + t('收藏方案')} onClick={onEdit}>{t('编辑')}</button>
@@ -88,7 +88,7 @@ function TaskThumbnail({ src, alt, onPreview }: {
   if (!src) return <span className="my-task-empty-cell">-</span>
   return (
     <button className="my-task-image-button" type="button" aria-label={t('预览') + ' ' + alt} onClick={() => onPreview(src, alt)}>
-      <CachedImage src={src} alt={alt} />
+      <CachedImage src={src} alt={alt} thumbnail />
     </button>
   )
 }

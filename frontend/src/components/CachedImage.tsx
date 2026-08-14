@@ -24,20 +24,24 @@ function cachedImageUrl(source: string): Promise<string> {
 type CachedImageProps = Omit<ComponentPropsWithoutRef<'img'>, 'src' | 'loading'> & {
   src: string
   loading?: 'eager' | 'lazy'
+  thumbnail?: boolean
 }
 
 /** Cache authenticated API images for the current tab and defer off-screen requests. */
-export function CachedImage({ src, loading = 'lazy', ...props }: CachedImageProps) {
+export function CachedImage({ src, loading = 'lazy', thumbnail = false, ...props }: CachedImageProps) {
+  const requestedSrc = thumbnail && src.includes('/api/')
+    ? `${src}${src.includes('?') ? '&' : '?'}thumbnail=true`
+    : src
   const imageRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(loading === 'eager')
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(() => (
-    src.includes('/api/') ? null : src
+    requestedSrc.includes('/api/') ? null : requestedSrc
   ))
 
   useEffect(() => {
-    setResolvedSrc(src.includes('/api/') ? null : src)
+    setResolvedSrc(requestedSrc.includes('/api/') ? null : requestedSrc)
     setShouldLoad(loading === 'eager')
-  }, [src, loading])
+  }, [requestedSrc, loading])
 
   useEffect(() => {
     if (shouldLoad || loading !== 'lazy') return
@@ -55,14 +59,14 @@ export function CachedImage({ src, loading = 'lazy', ...props }: CachedImageProp
   }, [loading, shouldLoad])
 
   useEffect(() => {
-    if (!shouldLoad || !src.includes('/api/')) return
+    if (!shouldLoad || !requestedSrc.includes('/api/')) return
     let active = true
-    void cachedImageUrl(src).then(
+    void cachedImageUrl(requestedSrc).then(
       (objectUrl) => { if (active) setResolvedSrc(objectUrl) },
-      () => { if (active) setResolvedSrc(src) },
+      () => { if (active) setResolvedSrc(requestedSrc) },
     )
     return () => { active = false }
-  }, [shouldLoad, src])
+  }, [shouldLoad, requestedSrc])
 
   return <img ref={imageRef} src={resolvedSrc ?? undefined} {...props} />
 }

@@ -434,7 +434,7 @@ class CustomerDecisionService:
         )
 
     async def read_saved_logo(
-        self, session: AsyncSession, customer_id: str, saved_logo_id: str
+        self, session: AsyncSession, customer_id: str, saved_logo_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
         row = (
             await session.execute(
@@ -454,7 +454,7 @@ class CustomerDecisionService:
             session,
             logo.asset_id,
             "saved_logo_not_found",
-            "Saved Logo not found",
+            "Saved Logo not found", thumbnail=thumbnail,
         )
 
     async def read_task_image(
@@ -464,6 +464,7 @@ class CustomerDecisionService:
         task_id: str,
         *,
         initial: bool,
+        thumbnail: bool = False,
     ) -> tuple[str, bytes]:
         task = await session.scalar(
             select(DesignTask).where(
@@ -480,11 +481,11 @@ class CustomerDecisionService:
             session,
             asset_id,
             "task_image_not_found",
-            "Task image not found",
+            "Task image not found", thumbnail=thumbnail,
         )
 
     async def read_task_delivery_image(
-        self, session: AsyncSession, customer_id: str, task_id: str
+        self, session: AsyncSession, customer_id: str, task_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
         """Read a completed delivery image only for its owning customer."""
 
@@ -500,13 +501,13 @@ class CustomerDecisionService:
             )
         try:
             asset, content = await self._assets.read_task_delivery_image(
-                session, task.delivery_asset_id
+                session, task.delivery_asset_id, thumbnail=thumbnail
             )
         except LookupError as error:
             raise CustomerDecisionError(
                 "task_delivery_not_found", "Task delivery image not found", 404
             ) from error
-        return asset.media_type, content
+        return ("image/webp" if thumbnail else asset.media_type), content
 
     async def _owned_logo(
         self, session: AsyncSession, customer_id: str, logo_version_id: str
@@ -579,12 +580,16 @@ class CustomerDecisionService:
         asset_id: str,
         error_code: str,
         message: str,
+        *,
+        thumbnail: bool = False,
     ) -> tuple[str, bytes]:
         try:
-            asset, content = await self._assets.read_generated_logo(session, asset_id)
+            asset, content = await self._assets.read_generated_logo(
+                session, asset_id, thumbnail=thumbnail
+            )
         except LookupError as error:
             raise CustomerDecisionError(error_code, message, 404) from error
-        return asset.media_type, content
+        return ("image/webp" if thumbnail else asset.media_type), content
 
     async def _replay(
         self,

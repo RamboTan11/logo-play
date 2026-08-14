@@ -509,7 +509,7 @@ class BatchGenerationService:
             return await self._status_dto(session, request)
 
     async def read_logo_image(
-        self, customer_id: str, window_anchor_request_id: str, logo_version_id: str
+        self, customer_id: str, window_anchor_request_id: str, logo_version_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
         """Read one result only when it belongs to the two-successful-batch window."""
 
@@ -529,8 +529,10 @@ class BatchGenerationService:
                 raise BatchGenerationRequestError(
                     "generation_image_not_found", "生成图片不存在", 404
                 )
-            asset, content = await self._assets.read_generated_logo(session, logo.asset_id)
-            return asset.media_type, cast(bytes, content)
+            asset, content = await self._assets.read_generated_logo(
+                session, logo.asset_id, thumbnail=thumbnail
+            )
+            return ("image/webp" if thumbnail else asset.media_type), cast(bytes, content)
 
     async def _successful_batch_window(
         self, session: AsyncSession, anchor: GenerationRequest
