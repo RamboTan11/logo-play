@@ -25,21 +25,26 @@ type CachedImageProps = Omit<ComponentPropsWithoutRef<'img'>, 'src' | 'loading'>
   src: string
   loading?: 'eager' | 'lazy'
   thumbnail?: boolean
+  progressive?: boolean
 }
 
-/** Cache authenticated API images for the current tab and defer off-screen requests. */
+/** Cache authenticated API images, defer off-screen requests, and optionally upgrade previews. */
 export function CachedImage({
   src,
   loading = 'lazy',
   thumbnail = false,
+  progressive = false,
   className,
   onLoad,
   onError,
   ...props
 }: CachedImageProps) {
-  const requestedSrc = thumbnail && src.includes('/api/')
+  const protectedApiImage = src.includes('/api/')
+  const thumbnailSrc = protectedApiImage
     ? `${src}${src.includes('?') ? '&' : '?'}thumbnail=true`
     : src
+  const requestedSrc = (thumbnail || progressive) && protectedApiImage ? thumbnailSrc : src
+  const upgradeSrc = progressive && protectedApiImage ? src : null
   const imageRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(loading === 'eager')
   const [loaded, setLoaded] = useState(false)
@@ -77,6 +82,17 @@ export function CachedImage({
     )
     return () => { active = false }
   }, [shouldLoad, requestedSrc])
+
+  useEffect(() => {
+    if (!shouldLoad || !upgradeSrc || !resolvedSrc) return
+    let active = true
+    void cachedImageUrl(upgradeSrc).then(
+      (objectUrl) => { if (active) setResolvedSrc(objectUrl) },
+      // Keep the already rendered preview when the optional upgrade fails.
+      () => undefined,
+    )
+    return () => { active = false }
+  }, [shouldLoad, upgradeSrc, resolvedSrc])
 
   return <img
     ref={imageRef}
