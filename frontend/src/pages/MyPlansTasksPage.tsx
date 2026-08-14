@@ -55,24 +55,30 @@ function scrollSavedLogosWithWheel(event: ReactWheelEvent<HTMLDivElement>): void
 
 const adoptTooltip = '采用此方案后，我们会继续完善细节，并向你交付最终图片'
 const completedDeliveryTooltip = '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。'
+const taskStatusLoadingTooltip = '正在加载当前任务状态。'
 
-function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked }: {
+function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked, isAdoptionPending }: {
   logo: SavedLogoListItem
   onEdit: () => void
   onAdopt: () => void
   isAdoptionLocked: boolean
+  isAdoptionPending: boolean
 }) {
   const { t } = useClientLanguage()
   const tooltipId = 'saved-logo-adopt-lock-' + logo.id
+  const isAdoptionDisabled = isAdoptionLocked || isAdoptionPending
+  const tooltip = isAdoptionLocked ? completedDeliveryTooltip : isAdoptionPending
+    ? taskStatusLoadingTooltip
+    : adoptTooltip
   return (
     <article className="saved-logo-card" tabIndex={-1}>
       <div className="saved-logo-image"><CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail /></div>
       <div className="saved-logo-card-copy"><b>{t('已收藏方案')}</b><span>{logo.domain}</span></div>
       <div className="saved-logo-card-actions">
         <button className="secondary" type="button" aria-label={t('编辑') + ' ' + logo.domain + ' ' + t('收藏方案')} onClick={onEdit}>{t('编辑')}</button>
-        <div className={'adopt-tooltip' + (isAdoptionLocked ? ' adopt-disabled-tooltip' : '')} tabIndex={isAdoptionLocked ? 0 : undefined} aria-describedby={isAdoptionLocked ? tooltipId : undefined}>
-          <button className="primary" type="button" aria-label={t('采用') + ' ' + logo.domain + ' ' + t('收藏方案')} aria-describedby={isAdoptionLocked ? tooltipId : undefined} disabled={isAdoptionLocked} onClick={onAdopt}>{t('采用')}</button>
-          <span id={tooltipId} role="tooltip">{t(isAdoptionLocked ? completedDeliveryTooltip : adoptTooltip)}</span>
+        <div className={'adopt-tooltip' + (isAdoptionDisabled ? ' adopt-disabled-tooltip' : '')} tabIndex={isAdoptionDisabled ? 0 : undefined} aria-describedby={isAdoptionDisabled ? tooltipId : undefined}>
+          <button className="primary" type="button" aria-label={t('采用') + ' ' + logo.domain + ' ' + t('收藏方案')} aria-describedby={isAdoptionDisabled ? tooltipId : undefined} disabled={isAdoptionDisabled} onClick={onAdopt}>{t('采用')}</button>
+          <span id={tooltipId} role="tooltip">{t(tooltip)}</span>
         </div>
       </div>
     </article>
@@ -129,7 +135,7 @@ function TaskRow({
 }
 
 function TaskImage({ src, alt }: { src: string; alt: string }) {
-  return <div className="client-task-snapshot-image"><CachedImage src={src} alt={alt} loading="eager" /></div>
+  return <div className="client-task-snapshot-image"><CachedImage src={src} alt={alt} loading="eager" progressive /></div>
 }
 
 function DeliveryPendingPreview() {
@@ -185,10 +191,20 @@ function ImagePreviewModal({ src, alt, onClose }: { src: string; alt: string; on
     <div className="my-task-image-preview" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="my-task-image-preview-dialog" role="dialog" aria-modal="true" aria-label={alt}>
         <button ref={closeButtonRef} className="my-task-image-preview-close" type="button" aria-label={t('关闭图片预览')} onClick={onClose}>×</button>
-        <CachedImage src={src} alt={alt} loading="eager" />
+        <CachedImage src={src} alt={alt} loading="eager" progressive />
       </section>
     </div>
   )
+}
+
+function SavedLogosLoading() {
+  const { t } = useClientLanguage()
+  return <div className="my-plans-skeleton saved" aria-label={t('正在加载收藏方案')} aria-busy="true"><i /><i /><i /></div>
+}
+
+function TasksLoading() {
+  const { t } = useClientLanguage()
+  return <div className="my-plans-skeleton tasks" aria-label={t('正在加载方案列表')} aria-busy="true"><i /><i /><i /></div>
 }
 
 export function MyPlansTasksPage() {
@@ -196,8 +212,10 @@ export function MyPlansTasksPage() {
   const navigate = useNavigate()
   const [savedLogos, setSavedLogos] = useState<SavedLogoListItem[]>([])
   const [tasks, setTasks] = useState<MyTaskListItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [pageLoadError, setPageLoadError] = useState<string | null>(null)
+  const [isSavedLogosLoading, setIsSavedLogosLoading] = useState(true)
+  const [isTasksLoading, setIsTasksLoading] = useState(true)
+  const [savedLogosLoadError, setSavedLogosLoadError] = useState<string | null>(null)
+  const [tasksLoadError, setTasksLoadError] = useState<string | null>(null)
   const [openingTaskId, setOpeningTaskId] = useState<string | null>(null)
   const [detailLoadError, setDetailLoadError] = useState<{ taskId: string; message: string } | null>(null)
   const [selectedTask, setSelectedTask] = useState<MyTaskDetail | null>(null)
@@ -214,20 +232,32 @@ export function MyPlansTasksPage() {
 
   const loadPage = useCallback(async (activeRef?: { current: boolean }) => {
     if (activeRef && !activeRef.current) return
-    setIsLoading(true)
-    setPageLoadError(null)
-    try {
-      const [nextSavedLogos, nextTasks] = await Promise.all([getSavedLogos(), getMyTasks()])
-      if (activeRef && !activeRef.current) return
-      setSavedLogos(nextSavedLogos)
-      setTasks(nextTasks)
-    } catch {
-      if (!activeRef || activeRef.current) {
-        setPageLoadError(t('方案与任务加载失败，请稍后重试。'))
-      }
-    } finally {
-      if (!activeRef || activeRef.current) setIsLoading(false)
-    }
+    setIsSavedLogosLoading(true)
+    setIsTasksLoading(true)
+    setSavedLogosLoadError(null)
+    setTasksLoadError(null)
+    await Promise.all([
+      getSavedLogos().then(
+        (nextSavedLogos) => {
+          if (!activeRef || activeRef.current) setSavedLogos(nextSavedLogos)
+        },
+        () => {
+          if (!activeRef || activeRef.current) setSavedLogosLoadError(t('收藏方案加载失败，请稍后重试。'))
+        },
+      ).finally(() => {
+        if (!activeRef || activeRef.current) setIsSavedLogosLoading(false)
+      }),
+      getMyTasks().then(
+        (nextTasks) => {
+          if (!activeRef || activeRef.current) setTasks(nextTasks)
+        },
+        () => {
+          if (!activeRef || activeRef.current) setTasksLoadError(t('方案列表加载失败，请稍后重试。'))
+        },
+      ).finally(() => {
+        if (!activeRef || activeRef.current) setIsTasksLoading(false)
+      }),
+    ])
   }, [t])
 
   useEffect(() => {
@@ -321,13 +351,11 @@ export function MyPlansTasksPage() {
   return (
     <ClientShell>
       <main className="client-main my-plans-main">
-        {isLoading ? <p className="my-plans-loading">{t('正在加载方案与任务...')}</p> : pageLoadError ? <section className="my-plans-load-error" role="alert"><p>{pageLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : <>
-          <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} onEdit={() => navigate('/edit/' + encodeURIComponent(logo.logo_version_id))} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
+        <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => navigate('/edit/' + encodeURIComponent(logo.logo_version_id))} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
-            {tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
+            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
           </section>
-        </>}
       </main>
       {detailLoadError && <section className="my-plans-detail-error" role="alert" aria-live="polite"><p>{detailLoadError.message}</p><button className="secondary" type="button" onClick={() => void openTask(detailLoadError.taskId)} disabled={openingTaskId === detailLoadError.taskId}>{t('重试')}</button></section>}
       {selectedTask && <TaskDetailsModal task={selectedTask} onClose={() => setSelectedTask(null)} />}

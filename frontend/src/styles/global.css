@@ -1203,6 +1203,12 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 
 /* T-031: normalized customer plan table and image preview. */
 .my-plans-main { max-width:1440px; }
+.my-plans-skeleton { display:grid; gap:12px; width:100%; overflow:hidden; }
+.my-plans-skeleton.saved { grid-template-columns:repeat(3,minmax(0,272px)); padding:4px; }
+.my-plans-skeleton.tasks { min-height:260px; padding:16px; border:1px solid var(--line-red); border-radius:6px; background:rgba(26,8,13,.56); }
+.my-plans-skeleton i { display:block; border:1px solid rgba(255,45,91,.22); border-radius:6px; background:#241116; }
+.my-plans-skeleton.saved i { aspect-ratio:1 / 1.34; }
+.my-plans-skeleton.tasks i { height:62px; }
 .my-plans-table-wrap { width:100%; overflow-x:auto; border:1px solid var(--line-red); border-radius:6px; background:rgba(26,8,13,.56); }
 .my-plans-table { width:100%; min-width:1180px; border-collapse:collapse; table-layout:fixed; }
 .my-plans-table th,.my-plans-table td { padding:12px 10px; border-bottom:1px solid var(--line-red); text-align:left; vertical-align:middle; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
@@ -1238,6 +1244,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 
 @media (max-width:760px) {
   .my-plans-main { padding-right:14px; padding-left:14px; }
+  .my-plans-skeleton.saved { grid-template-columns:260px; }
   .my-plans-table-wrap { margin-right:-2px; }
   .my-plans-detail-error { right:14px; bottom:14px; max-width:calc(100vw - 28px); align-items:stretch; flex-direction:column; }
   .my-task-image-preview { padding:0; }

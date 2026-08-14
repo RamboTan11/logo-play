@@ -63,6 +63,11 @@ class LocalFallbackAssetStorage:
 
         return self._path_for_key(storage_key).read_bytes()
 
+    def has_thumbnail(self, storage_key: str) -> bool:
+        """Return whether an asset already has its persisted WebP preview."""
+
+        return self._thumbnail_path(storage_key).is_file()
+
     def read_thumbnail(self, storage_key: str, original: bytes) -> bytes:
         """Return a persisted WebP preview, deriving it locally on first request."""
 
