@@ -104,7 +104,10 @@ export async function createSingleEditGeneration(
       edit_instruction: editInstruction,
     })).data.data
   } catch (error) {
-    throw new GenerationApiError(errorCode(error) ?? 'single_edit_request_failed', '生成新版本失败，请稍后重试。')
+    throw new GenerationApiError(
+      errorCode(error) ?? 'single_edit_request_failed',
+      '生成新版本失败，请稍后重试。',
+    )
   }
 }
 
@@ -187,7 +190,10 @@ export async function getSingleEditStatus(requestId: string): Promise<SingleEdit
       `/v1/generations/single-edit/${encodeURIComponent(requestId)}`,
     )).data.data
   } catch (error) {
-    throw new GenerationApiError(errorCode(error) ?? 'single_edit_status_failed', '新版本状态查询失败，请稍后重试。')
+    throw new GenerationApiError(
+      errorCode(error) ?? 'single_edit_status_failed',
+      '新版本状态查询失败，请稍后重试。',
+    )
   }
 }
 
@@ -197,7 +203,10 @@ export async function getSingleEditContext(logoVersionId: string): Promise<Singl
       `/v1/generations/logo-versions/${encodeURIComponent(logoVersionId)}/single-edit-context`,
     )).data.data
   } catch (error) {
-    throw new GenerationApiError(errorCode(error) ?? 'single_edit_context_failed', '单图编辑内容加载失败。')
+    throw new GenerationApiError(
+      errorCode(error) ?? 'single_edit_context_failed',
+      '单图编辑内容加载失败。',
+    )
   }
 }
 

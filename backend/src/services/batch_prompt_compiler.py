@@ -25,7 +25,6 @@ CUSTOMER_SOURCE_RULES = (
     "未点名的核心识别元素保留；禁止照搬客户图的材质、光影、背景、样机呈现或低质细节。"
 )
 DEFAULT_REFERENCE_REQUIREMENT = "无额外参考要求"
-MAX_PARALLELISM = 4
 REPLENISHMENT_BUDGET = 2
 
 _TEMPLATE_VARIABLE_PATTERN = re.compile(r"{{\s*([^{}]+?)\s*}}")

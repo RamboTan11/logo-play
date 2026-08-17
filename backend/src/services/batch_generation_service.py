@@ -39,7 +39,6 @@ from src.services.asset_service import (
 )
 from src.services.batch_generation_policy_service import BatchGenerationPolicyService
 from src.services.batch_prompt_compiler import (
-    MAX_PARALLELISM,
     REPLENISHMENT_BUDGET,
     BatchCompileContext,
     BatchTemplateCombination,
@@ -66,7 +65,6 @@ from src.services.model_secret_service import ModelConnectionSecretService, Secr
 
 _BATCH_SCENE = "batch_generation"
 _MAX_PROVIDER_ATTEMPTS = 2
-_KIE_SUBMISSION_INTERVAL_SECONDS = 1.0
 _TERMINAL_PROVIDER_FAILURES = {
     "generation_configuration_failed",
     "invalid_output_count",
@@ -109,23 +107,14 @@ class BatchGenerationService:
         secret_encryption_key: str | None,
         provider: ImageGenerationProvider | None = None,
         events: EventService | None = None,
-        kie_submission_interval_seconds: float = _KIE_SUBMISSION_INTERVAL_SECONDS,
         retry_token_secret: str | None = None,
     ) -> None:
-        if kie_submission_interval_seconds < 0:
-            raise ValueError("Kie submission interval cannot be negative")
         self._runtime = runtime
         event_service = events or EventService()
         self._assets = AssetService(LocalFallbackAssetStorage(asset_root), event_service)
         self._provider_override = provider
         self._secrets = ModelConnectionSecretService(secret_encryption_key)
         self._events = event_service
-        self._execution_lock = asyncio.Lock()
-        self._provider_semaphore = asyncio.Semaphore(MAX_PARALLELISM)
-        self._kie_submission_lock = asyncio.Lock()
-        self._kie_submission_interval_seconds = kie_submission_interval_seconds
-        self._kie_next_submission_at = 0.0
-        self._kie_submission_blocked_error: ProviderError | None = None
         self._scheduled: set[asyncio.Task[None]] = set()
         self._scheduled_request_ids: set[str] = set()
         self._retry_token_secret = (retry_token_secret or secret_encryption_key or "").encode()
@@ -394,83 +383,82 @@ class BatchGenerationService:
             await self._execute_candidate(job_id)
 
     async def execute(self, request_id: str) -> None:
-        """Resume one persisted request until it reaches a terminal status."""
+        """Resume one request without delaying any other accepted batch."""
 
-        async with self._execution_lock:
-            self._kie_submission_blocked_error = None
-            try:
-                while True:
-                    request = await self._request(request_id)
-                    if request is None or request.status in {"succeeded", "failed"}:
-                        return
-                    await self._recover_running_jobs(request_id)
-                    pending = await self._pending_jobs(request_id)
-                    if pending:
-                        await asyncio.gather(*(self._execute_candidate(job.id) for job in pending))
-                        continue
+        try:
+            while True:
+                request = await self._request(request_id)
+                if request is None or request.status in {"succeeded", "failed"}:
+                    return
+                await self._recover_running_jobs(request_id)
+                pending = await self._pending_jobs(request_id)
+                if pending:
+                    # Every selected candidate owns one provider task and starts together.
+                    await asyncio.gather(*(self._execute_candidate(job.id) for job in pending))
+                    continue
 
-                    success_count, failed_jobs, total_jobs = await self._job_counts(request_id)
-                    if success_count >= request.target_count:
-                        await self._finish(request_id, "succeeded", None)
-                        return
-                    if any(
-                        job.error_code in _TERMINAL_PROVIDER_FAILURES for job in failed_jobs
-                    ):
-                        await self._finish(
-                            request_id,
-                            "succeeded" if success_count else "failed",
-                            {
-                                "success_count": success_count,
-                                "failed_count": len(failed_jobs),
-                                "failure_codes": sorted(
-                                    {job.error_code for job in failed_jobs if job.error_code}
-                                ),
-                            },
-                        )
-                        return
-                    if any(
-                        job.error_code in _NON_REPLENISHABLE_FAILURES
-                        and job.provider_submission_state in {"submitting", "submitted"}
-                        for job in failed_jobs
-                    ):
-                        await self._finish(
-                            request_id,
-                            "succeeded" if success_count else "failed",
-                            {
-                                "success_count": success_count,
-                                "failed_count": len(failed_jobs),
-                                "failure_codes": sorted(
-                                    {job.error_code for job in failed_jobs if job.error_code}
-                                ),
-                            },
-                        )
-                        return
-                    replacements_used = max(0, total_jobs - request.target_count)
-                    remaining_budget = REPLENISHMENT_BUDGET - replacements_used
-                    if remaining_budget <= 0 or not failed_jobs:
-                        await self._finish(
-                            request_id,
-                            "succeeded" if success_count else "failed",
-                            {
-                                "success_count": success_count,
-                                "failed_count": len(failed_jobs),
-                                "failure_codes": sorted(
-                                    {job.error_code for job in failed_jobs if job.error_code}
-                                ),
-                            },
-                        )
-                        return
-                    await self._create_replenishments(request_id, failed_jobs[:remaining_budget])
-            except (BatchGenerationRequestError, LookupError, ValueError):
-                await self._finish(
-                    request_id,
-                    "failed",
-                    {
-                        "success_count": 0,
-                        "failed_count": 0,
-                        "failure_codes": ["runtime_unavailable"],
-                    },
-                )
+                success_count, failed_jobs, total_jobs = await self._job_counts(request_id)
+                if success_count >= request.target_count:
+                    await self._finish(request_id, "succeeded", None)
+                    return
+                if any(
+                    job.error_code in _TERMINAL_PROVIDER_FAILURES for job in failed_jobs
+                ):
+                    await self._finish(
+                        request_id,
+                        "succeeded" if success_count else "failed",
+                        {
+                            "success_count": success_count,
+                            "failed_count": len(failed_jobs),
+                            "failure_codes": sorted(
+                                {job.error_code for job in failed_jobs if job.error_code}
+                            ),
+                        },
+                    )
+                    return
+                if any(
+                    job.error_code in _NON_REPLENISHABLE_FAILURES
+                    and job.provider_submission_state in {"submitting", "submitted"}
+                    for job in failed_jobs
+                ):
+                    await self._finish(
+                        request_id,
+                        "succeeded" if success_count else "failed",
+                        {
+                            "success_count": success_count,
+                            "failed_count": len(failed_jobs),
+                            "failure_codes": sorted(
+                                {job.error_code for job in failed_jobs if job.error_code}
+                            ),
+                        },
+                    )
+                    return
+                replacements_used = max(0, total_jobs - request.target_count)
+                remaining_budget = REPLENISHMENT_BUDGET - replacements_used
+                if remaining_budget <= 0 or not failed_jobs:
+                    await self._finish(
+                        request_id,
+                        "succeeded" if success_count else "failed",
+                        {
+                            "success_count": success_count,
+                            "failed_count": len(failed_jobs),
+                            "failure_codes": sorted(
+                                {job.error_code for job in failed_jobs if job.error_code}
+                            ),
+                        },
+                    )
+                    return
+                await self._create_replenishments(request_id, failed_jobs[:remaining_budget])
+        except (BatchGenerationRequestError, LookupError, ValueError):
+            await self._finish(
+                request_id,
+                "failed",
+                {
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "failure_codes": ["runtime_unavailable"],
+                },
+            )
 
     async def status_for_customer(self, customer_id: str, request_id: str) -> GenerationStatusDto:
         """Return request status plus the two latest successful result batches."""
@@ -575,58 +563,57 @@ class BatchGenerationService:
     async def _execute_candidate(self, job_id: str) -> None:
         """Run one candidate with a bounded retry count and no shared DB transaction."""
 
-        async with self._provider_semaphore:
-            last_error: ProviderError | None = None
-            for _ in range(_MAX_PROVIDER_ATTEMPTS):
-                try:
-                    connection, job, provider_request = await self._provider_input(job_id)
-                    provider = image_provider_for_connection(
-                        connection.provider,
-                        connection.model_id,
-                        self._provider_override,
-                    )
-                    result = await self._generate(
-                        provider,
-                        connection,
-                        job,
-                        provider_request,
-                    )
-                    if (
-                        result.diagnostic_capture_status != "captured"
-                        or result.diagnostic_image is None
-                        or result.diagnostic_media_type is None
-                        or not is_valid_native_output(
-                            result.diagnostic_image,
-                            result.diagnostic_media_type,
-                            connection.model_id,
-                        )
-                    ):
-                        raise ProviderError(
-                            "invalid_generated_image",
-                            "Generated image did not meet output requirements",
-                        )
-                    await self._persist_success(
-                        connection,
-                        job,
+        last_error: ProviderError | None = None
+        for _ in range(_MAX_PROVIDER_ATTEMPTS):
+            try:
+                connection, job, provider_request = await self._provider_input(job_id)
+                provider = image_provider_for_connection(
+                    connection.provider,
+                    connection.model_id,
+                    self._provider_override,
+                )
+                result = await self._generate(
+                    provider,
+                    connection,
+                    job,
+                    provider_request,
+                )
+                if (
+                    result.diagnostic_capture_status != "captured"
+                    or result.diagnostic_image is None
+                    or result.diagnostic_media_type is None
+                    or not is_valid_native_output(
                         result.diagnostic_image,
                         result.diagnostic_media_type,
-                        result.provider_http_status,
-                        result.response_image_count,
-                        result.provider_request_id_hash,
+                        connection.model_id,
                     )
-                    return
-                except ProviderError as error:
-                    last_error = error
-                    if error.code in _TERMINAL_PROVIDER_FAILURES or error.code in {
-                        "provider_submission_uncertain",
-                    }:
-                        break
-                except (LookupError, SecretConfigurationError, ValueError) as error:
-                    last_error = ProviderError("generation_configuration_failed", str(error))
+                ):
+                    raise ProviderError(
+                        "invalid_generated_image",
+                        "Generated image did not meet output requirements",
+                    )
+                await self._persist_success(
+                    connection,
+                    job,
+                    result.diagnostic_image,
+                    result.diagnostic_media_type,
+                    result.provider_http_status,
+                    result.response_image_count,
+                    result.provider_request_id_hash,
+                )
+                return
+            except ProviderError as error:
+                last_error = error
+                if error.code in _TERMINAL_PROVIDER_FAILURES or error.code in {
+                    "provider_submission_uncertain",
+                }:
                     break
-            await self._persist_failure(
-                job_id, last_error or ProviderError("generation_failed", "Generation failed")
-            )
+            except (LookupError, SecretConfigurationError, ValueError) as error:
+                last_error = ProviderError("generation_configuration_failed", str(error))
+                break
+        await self._persist_failure(
+            job_id, last_error or ProviderError("generation_failed", "Generation failed")
+        )
 
     async def _generate(
         self,
@@ -657,34 +644,9 @@ class BatchGenerationService:
         api_url: str,
         request: ImageGenerationRequest,
     ) -> KieTaskSubmission:
-        """Serialize Kie uploads/task creation and stop a batch after deterministic 4xx."""
+        """Submit one independent Kie task without serializing its batch peers."""
 
-        async with self._kie_submission_lock:
-            blocked = self._kie_submission_blocked_error
-            if blocked is not None:
-                raise ProviderError(
-                    blocked.code,
-                    str(blocked),
-                    blocked.http_status_family,
-                    blocked.provider_http_status,
-                    blocked.response_image_count,
-                    blocked.provider_request_id_hash,
-                    blocked.provider_operation,
-                )
-            loop = asyncio.get_running_loop()
-            delay = self._kie_next_submission_at - loop.time()
-            if delay > 0:
-                await asyncio.sleep(delay)
-            try:
-                return await provider.submit(api_url, request)
-            except ProviderError as error:
-                if error.code in _TERMINAL_PROVIDER_FAILURES:
-                    self._kie_submission_blocked_error = error
-                raise
-            finally:
-                self._kie_next_submission_at = (
-                    asyncio.get_running_loop().time() + self._kie_submission_interval_seconds
-                )
+        return await provider.submit(api_url, request)
 
     async def _claim_provider_submission(self, job_id: str) -> str | None:
         async with get_db_context(self._runtime) as session:
@@ -1143,7 +1105,7 @@ class BatchGenerationService:
             "output_constraint": compilation.output_constraint,
             "rendering": fixed_rendering_metadata(model_id),
             "target_count": request.target_count,
-            "max_parallelism": MAX_PARALLELISM,
+            "max_parallelism": request.target_count,
             "replenishment_budget": REPLENISHMENT_BUDGET,
             "provider_max_input_images": context.max_input_images,
             "reference_limit_preflight": {

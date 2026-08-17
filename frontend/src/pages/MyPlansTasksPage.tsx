@@ -99,6 +99,39 @@ function TaskThumbnail({ src, alt, onPreview }: {
   )
 }
 
+function AppMockup({ imageUrl, domain, thumbnail = true, className = '' }: {
+  imageUrl: string
+  domain: string
+  thumbnail?: boolean
+  className?: string
+}) {
+  const { t } = useClientLanguage()
+  const appName = domain.split('.')[0]?.toUpperCase() || domain.toUpperCase()
+  return (
+    <div className={`my-task-mockup ${className}`} role="img" aria-label={`${domain} ${t('应用样机预览')}`}>
+      <img className="my-task-mockup-reference" src="/mockups/iphone-home-screen-source.png" alt="" aria-hidden="true" />
+      <div className="my-task-mockup-selected-app">
+        <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} loading={thumbnail ? 'lazy' : 'eager'} /></div>
+        <span>{appName}</span>
+      </div>
+    </div>
+  )
+}
+
+function TaskMockupThumbnail({ src, domain, onPreview }: {
+  src: string | null
+  domain: string
+  onPreview: (src: string, domain: string) => void
+}) {
+  const { t } = useClientLanguage()
+  if (!src) return <span className="my-task-empty-cell">-</span>
+  return (
+    <button className="my-task-mockup-button" type="button" aria-label={t('预览') + ' ' + domain + ' ' + t('应用样机预览')} onClick={() => onPreview(src, domain)}>
+      <AppMockup imageUrl={src} domain={domain} />
+    </button>
+  )
+}
+
 function TaskRow({
   task,
   isOpening,
@@ -106,6 +139,7 @@ function TaskRow({
   onViewDetails,
   onModifySuggestion,
   onPreview,
+  onMockupPreview,
 }: {
   task: MyTaskListItem
   isOpening: boolean
@@ -113,6 +147,7 @@ function TaskRow({
   onViewDetails: (taskId: string) => void
   onModifySuggestion: (task: MyTaskListItem) => void
   onPreview: (src: string, alt: string) => void
+  onMockupPreview: (src: string, domain: string) => void
 }) {
   const { t } = useClientLanguage()
   return (
@@ -124,6 +159,7 @@ function TaskRow({
       <td><span className={'task-status ' + task.status}>{t(taskStatusLabels[task.status])}</span></td>
       <td><TaskThumbnail src={task.delivery_image_url} alt={task.domain + ' ' + t('精修图片')} onPreview={onPreview} /></td>
       <td>{task.delivery_uploaded_at ? <time dateTime={task.delivery_uploaded_at}>{formatBeijingDateTime(task.delivery_uploaded_at)}</time> : '-'}</td>
+      <td><TaskMockupThumbnail src={task.delivery_image_url} domain={task.domain} onPreview={onMockupPreview} /></td>
       <td>
         <div className="my-task-actions">
           <button className="secondary" type="button" disabled={isOpening || isUpdating} onClick={() => onViewDetails(task.id)}>{t(isOpening ? '加载中...' : '查看详情')}</button>
@@ -197,6 +233,29 @@ function ImagePreviewModal({ src, alt, onClose }: { src: string; alt: string; on
   )
 }
 
+function MockupPreviewModal({ src, domain, onClose }: { src: string; domain: string; onClose: () => void }) {
+  const { t } = useClientLanguage()
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    closeButtonRef.current?.focus()
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
+
+  return (
+    <div className="my-task-image-preview" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="my-task-mockup-preview-dialog" role="dialog" aria-modal="true" aria-label={`${domain} ${t('应用样机预览')}`}>
+        <button ref={closeButtonRef} className="my-task-image-preview-close" type="button" aria-label={t('关闭图片预览')} onClick={onClose}>×</button>
+        <AppMockup imageUrl={src} domain={domain} thumbnail={false} className="my-task-mockup-large" />
+      </section>
+    </div>
+  )
+}
+
 function SavedLogosLoading() {
   const { t } = useClientLanguage()
   return <div className="my-plans-skeleton saved" aria-label={t('正在加载收藏方案')} aria-busy="true"><i /><i /><i /></div>
@@ -220,6 +279,7 @@ export function MyPlansTasksPage() {
   const [detailLoadError, setDetailLoadError] = useState<{ taskId: string; message: string } | null>(null)
   const [selectedTask, setSelectedTask] = useState<MyTaskDetail | null>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
+  const [previewMockup, setPreviewMockup] = useState<{ src: string; domain: string } | null>(null)
   const [adoptingSavedLogo, setAdoptingSavedLogo] = useState<SavedLogoListItem | null>(null)
   const [isAdoptingSavedLogo, setIsAdoptingSavedLogo] = useState(false)
   const [isChangingActiveTask, setIsChangingActiveTask] = useState(false)
@@ -354,12 +414,13 @@ export function MyPlansTasksPage() {
         <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => navigate('/edit/' + encodeURIComponent(logo.logo_version_id))} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
-            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
+            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
           </section>
       </main>
       {detailLoadError && <section className="my-plans-detail-error" role="alert" aria-live="polite"><p>{detailLoadError.message}</p><button className="secondary" type="button" onClick={() => void openTask(detailLoadError.taskId)} disabled={openingTaskId === detailLoadError.taskId}>{t('重试')}</button></section>}
       {selectedTask && <TaskDetailsModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
       {previewImage && <ImagePreviewModal src={previewImage.src} alt={previewImage.alt} onClose={() => setPreviewImage(null)} />}
+      {previewMockup && <MockupPreviewModal src={previewMockup.src} domain={previewMockup.domain} onClose={() => setPreviewMockup(null)} />}
       {adoptingSavedLogo && <AdoptionConfirmDialog domain={adoptingSavedLogo.domain} initialSuggestion="" isChange={isChangingActiveTask} isSubmitting={isAdoptingSavedLogo} onClose={() => { setAdoptingSavedLogo(null); setIsChangingActiveTask(false) }} onConfirm={(suggestion) => void adoptSavedLogo(suggestion)} />}
       {taskBeingModified && <AdoptionConfirmDialog domain={taskBeingModified.domain} initialSuggestion={taskBeingModified.adoption_suggestion ?? ''} isChange isSubmitting={isUpdatingSuggestion} errorMessage={suggestionError} onClose={() => { setTaskBeingModified(null); setSuggestionError(null) }} onConfirm={(suggestion) => void updateSuggestion(suggestion)} />}
     </ClientShell>
