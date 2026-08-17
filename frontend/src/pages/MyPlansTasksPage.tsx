@@ -12,6 +12,7 @@ import { formatBeijingDateTime } from '../utils/dateTime'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 
 const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
+const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen-source.png`
 
 const taskStatusLabels = {
   waiting_assignment: '待接单',
@@ -109,7 +110,7 @@ function AppMockup({ imageUrl, domain, thumbnail = true, className = '' }: {
   const appName = domain.split('.')[0]?.toUpperCase() || domain.toUpperCase()
   return (
     <div className={`my-task-mockup ${className}`} role="img" aria-label={`${domain} ${t('应用样机预览')}`}>
-      <img className="my-task-mockup-reference" src="/mockups/iphone-home-screen-source.png" alt="" aria-hidden="true" />
+      <img className="my-task-mockup-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" />
       <div className="my-task-mockup-selected-app">
         <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} loading={thumbnail ? 'lazy' : 'eager'} /></div>
         <span>{appName}</span>

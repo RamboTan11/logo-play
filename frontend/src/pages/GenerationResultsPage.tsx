@@ -24,6 +24,7 @@ type RememberedResultSelection = { batchId: string; logoVersionId: string }
 
 const defaultEditInstruction = '在保持当前品牌方向的基础上优化细节。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
+const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen-source.png`
 let rememberedResultSelection: RememberedResultSelection | null = null
 
 function readCandidateOverrides(): Record<string, CandidateOverride> {
@@ -307,7 +308,7 @@ export function GenerationResultsPage() {
           </> : <>
             <h2>{t('应用样机预览')}</h2>
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
-              <img className="ios-phone-reference" src="/mockups/iphone-home-screen-source.png" alt="" aria-hidden="true" />
+              <img className="ios-phone-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" />
               <div className="ios-phone-selected-app">
                 <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
                 <span>{batch.domain.split('.')[0].toUpperCase()}</span>
