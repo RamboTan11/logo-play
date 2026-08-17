@@ -24,7 +24,7 @@ type RememberedResultSelection = { batchId: string; logoVersionId: string }
 
 const defaultEditInstruction = '在保持当前品牌方向的基础上优化细节。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
-const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen-source.png`
+const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 let rememberedResultSelection: RememberedResultSelection | null = null
 
 function readCandidateOverrides(): Record<string, CandidateOverride> {

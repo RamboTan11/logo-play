@@ -12,7 +12,7 @@ import { formatBeijingDateTime } from '../utils/dateTime'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 
 const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
-const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen-source.png`
+const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 
 const taskStatusLabels = {
   waiting_assignment: '待接单',
