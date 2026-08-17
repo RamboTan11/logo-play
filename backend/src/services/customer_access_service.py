@@ -3,7 +3,7 @@
 import hmac
 import secrets
 from datetime import datetime, timedelta
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -228,7 +228,10 @@ class CustomerAccessService:
             trace_id=trace_id,
             summary={"customer_id": customer.id, "result": "copied"},
         )
-        return f"{self._frontend_base_url()}/access?token={token}"
+        # Each copied link must use a new URL. This prevents a misconfigured
+        # outer proxy from reusing a stale SPA entry document for the visitor.
+        query = urlencode({"token": token, "v": secrets.token_urlsafe(12)})
+        return f"{self._frontend_base_url()}/access?{query}"
 
     async def verify_access_token(
         self, session: AsyncSession, token: str, *, trace_id: str
