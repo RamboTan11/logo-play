@@ -7,7 +7,7 @@ import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
 import { adoptLogo, getMyTask, getMyTasks } from '../services/designTasksService'
 import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
-import { getSavedLogos } from '../services/savedLogosService'
+import { getSavedLogos, updateSavedLogo } from '../services/savedLogosService'
 import { useToastStore } from '../stores/useToastStore'
 import type { MyTaskDetail, MyTaskListItem, SavedLogoListItem } from '../types/api'
 import { formatBeijingDateTime } from '../utils/dateTime'
@@ -450,12 +450,18 @@ export function MyPlansTasksPage() {
     }
   }
 
-  const useEditedSavedLogo = (version: ResultEditVersion) => {
+  const useEditedSavedLogo = async (version: ResultEditVersion) => {
     if (!editingSavedLogo) return
-    setSavedLogos((current) => current.map((logo) => logo.id === editingSavedLogo.id
-      ? { ...logo, logo_version_id: version.id, image_url: version.imageUrl ?? logo.image_url }
-      : logo))
-    setEditingSavedLogo(null)
+    setIsEditingSavedLogo(true)
+    try {
+      const updated = await updateSavedLogo(editingSavedLogo.id, version.id)
+      setSavedLogos((current) => current.map((logo) => logo.id === editingSavedLogo.id
+        ? { ...updated.saved_logo, image_url: version.imageUrl ?? updated.saved_logo.image_url }
+        : logo))
+      setEditingSavedLogo(null)
+    } finally {
+      setIsEditingSavedLogo(false)
+    }
   }
 
   return (

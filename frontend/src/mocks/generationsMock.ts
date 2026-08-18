@@ -269,6 +269,25 @@ export async function saveLogoMock(
   }
 }
 
+export async function updateSavedLogoMock(
+  savedLogoId: string,
+  logoVersionId: string,
+): Promise<ApiResponse<SaveLogoData>> {
+  await new Promise((resolve) => window.setTimeout(resolve, 100))
+  const savedLogos = readMockSavedLogos()
+  const saved = savedLogos.find((logo) => logo.id === savedLogoId)
+  if (!saved) throw new Error('saved_logo_not_found')
+  const duplicate = savedLogos.find((logo) => logo.logo_version_id === logoVersionId && logo.id !== savedLogoId)
+  if (duplicate) throw new Error('saved_logo_version_exists')
+  const updated = { ...saved, logo_version_id: logoVersionId }
+  writeMockSavedLogos(savedLogos.map((logo) => logo.id === savedLogoId ? updated : logo))
+  return {
+    code: 200,
+    message: '已更新收藏方案',
+    data: { saved_logo: { ...updated, image_url: seededDeliveryImage }, created: false },
+  }
+}
+
 export async function getSavedLogosMock(): Promise<ApiResponse<SavedLogosData>> {
   await new Promise((resolve) => window.setTimeout(resolve, 80))
   const items = readMockSavedLogos().map((logo) => ({ ...logo, image_url: seededDeliveryImage }))

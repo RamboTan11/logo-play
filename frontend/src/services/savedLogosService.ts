@@ -1,4 +1,4 @@
-import { getSavedLogosMock, saveLogoMock } from '../mocks/generationsMock'
+import { getSavedLogosMock, saveLogoMock, updateSavedLogoMock } from '../mocks/generationsMock'
 import type { ApiResponse, SaveLogoData, SavedLogoListItem, SavedLogosData } from '../types/api'
 import { api } from './api'
 import {
@@ -25,6 +25,24 @@ export async function saveLogo(logoVersionId: string, domain = 'LOGO'): Promise<
   } catch (error) {
     if (hasServerResponse(error)) releaseIdempotencyKey(fingerprint)
     throw decisionError(error, 'save_logo_failed', '收藏失败，请稍后重试。')
+  }
+}
+
+export async function updateSavedLogo(savedLogoId: string, logoVersionId: string): Promise<SaveLogoData> {
+  if (isMockMode) return (await updateSavedLogoMock(savedLogoId, logoVersionId)).data
+
+  const fingerprint = `update-save:${savedLogoId}:${logoVersionId}`
+  try {
+    const response = await api.patch<ApiResponse<SaveLogoData>>(
+      `/v1/saved-logos/${encodeURIComponent(savedLogoId)}`,
+      { logo_version_id: logoVersionId },
+      { headers: { 'Idempotency-Key': idempotencyKey(fingerprint) } },
+    )
+    releaseIdempotencyKey(fingerprint)
+    return response.data.data
+  } catch (error) {
+    if (hasServerResponse(error)) releaseIdempotencyKey(fingerprint)
+    throw decisionError(error, 'saved_logo_update_failed', '收藏方案更新失败，请稍后重试。')
   }
 }
 

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import require_customer_session
 from src.db.session import get_db
-from src.models.customer_decision import AdoptLogoRequestDto, SaveLogoRequestDto
+from src.models.customer_decision import AdoptLogoRequestDto, SaveLogoRequestDto, UpdateSavedLogoRequestDto
 from src.services.auth_service import AuthenticatedPrincipal
 from src.services.customer_decision_service import (
     CustomerDecisionError,
@@ -87,6 +87,28 @@ async def list_saved_logos(
 ) -> APIResponse:
     result = await service.list_saved_logos(session, principal.id)
     return success_response(data=result.model_dump(mode="json"))
+
+
+@router.patch("/saved-logos/{saved_logo_id}", response_model=None)
+async def update_saved_logo(
+    saved_logo_id: str,
+    payload: UpdateSavedLogoRequestDto,
+    idempotency_key: IdempotencyKey,
+    principal: CustomerDependency,
+    session: DatabaseDependency,
+    service: ServiceDependency,
+) -> JSONResponse:
+    try:
+        result = await service.update_saved_logo(
+            session,
+            customer_id=principal.id,
+            saved_logo_id=saved_logo_id,
+            logo_version_id=payload.logo_version_id,
+            idempotency_key=idempotency_key,
+        )
+    except CustomerDecisionError as error:
+        return _error_response(error)
+    return _decision_response(result)
 
 
 @router.get("/saved-logos/{saved_logo_id}/image/content", response_model=None)

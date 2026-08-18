@@ -16,7 +16,7 @@ interface ResultEditDialogProps {
   isPageBusy: boolean
   onClose: () => void
   onGenerate: (instruction: string) => Promise<ResultEditVersion | null>
-  onUse: (version: ResultEditVersion) => void
+  onUse: (version: ResultEditVersion) => void | Promise<void>
 }
 
 export function ResultEditDialog({
@@ -59,6 +59,16 @@ export function ResultEditDialog({
     }
   }
 
+  const useGenerated = async () => {
+    if (!generated || isGenerating || isPageBusy) return
+    setError(null)
+    try {
+      await onUse(generated)
+    } catch {
+      setError(t('收藏方案更新失败，请稍后重试。'))
+    }
+  }
+
   const renderArtwork = (version: ResultEditVersion, label: string, artworkVariant: number) => (
     <div className="result-edit-artwork" aria-label={label}>
       {version.imageUrl
@@ -92,7 +102,7 @@ export function ResultEditDialog({
         <footer>
           {generated && <button className="secondary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void generate()}>{t('重新生成')}</button>}
           {generated
-            ? <button className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => onUse(generated)}>{t('选用')}</button>
+            ? <button className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void useGenerated()}>{t('选用')}</button>
             : <button ref={generateButtonRef} className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void generate()}>{t(isGenerating ? '生成中...' : '编辑优化')}</button>}
         </footer>
       </section>

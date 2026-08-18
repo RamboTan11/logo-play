@@ -15,6 +15,10 @@ class SaveLogoRequestDto(BaseModel):
     logo_version_id: str = Field(min_length=1, max_length=64)
 
 
+class UpdateSavedLogoRequestDto(SaveLogoRequestDto):
+    """Replace the immutable version referenced by one saved-logo record."""
+
+
 class AdoptLogoRequestDto(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

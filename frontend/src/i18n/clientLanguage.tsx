@@ -196,6 +196,7 @@ const english: Record<string, string> = {
   '修改建议已提交': 'Refinement notes submitted',
   '方案与任务加载失败，请稍后重试。': 'Unable to load designs and tasks. Please retry later.',
   '收藏方案加载失败，请稍后重试。': 'Unable to load saved designs. Please retry later.',
+  '收藏方案更新失败，请稍后重试。': 'Unable to update the saved design. Please try again later.',
   '方案列表加载失败，请稍后重试。': 'Unable to load the design list. Please retry later.',
   '方案详情加载失败，请稍后重试。': 'Unable to load design details. Please retry later.',
   '修改建议失败，请稍后重试。': 'Unable to update refinement notes. Please retry later.',

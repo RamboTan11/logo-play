@@ -33,6 +33,7 @@ from src.services.event_service import EventService
 from src.services.lark_notification_service import LarkWorkflowService
 
 _SAVE_ENDPOINT = "POST /api/v1/saved-logos"
+_UPDATE_SAVED_ENDPOINT = "PATCH /api/v1/saved-logos/{saved_logo_id}"
 _ADOPT_ENDPOINT = "POST /api/v1/design-tasks/adopt"
 
 
@@ -140,6 +141,98 @@ class CustomerDecisionService:
             key=key,
             request_hash=request_hash,
             status_code=201 if created else 200,
+            data=data,
+        )
+
+    async def update_saved_logo(
+        self,
+        session: AsyncSession,
+        *,
+        customer_id: str,
+        saved_logo_id: str,
+        logo_version_id: str,
+        idempotency_key: str,
+    ) -> DecisionResult:
+        key = _normalize_idempotency_key(idempotency_key)
+        endpoint = _UPDATE_SAVED_ENDPOINT.format(saved_logo_id=saved_logo_id)
+        request_hash = _request_hash({"logo_version_id": logo_version_id})
+        replay = await self._replay(session, customer_id, endpoint, key, request_hash)
+        if replay is not None:
+            return replay
+
+        saved = await session.scalar(
+            select(SavedLogo).where(
+                SavedLogo.id == saved_logo_id,
+                SavedLogo.customer_id == customer_id,
+            )
+        )
+        if saved is None:
+            return await self._store_error(
+                session,
+                customer_id=customer_id,
+                endpoint=endpoint,
+                key=key,
+                request_hash=request_hash,
+                code="saved_logo_not_found",
+                message="Saved logo not found",
+                status_code=404,
+            )
+
+        logo = await self._owned_logo(session, customer_id, logo_version_id)
+        if logo is None:
+            return await self._store_error(
+                session,
+                customer_id=customer_id,
+                endpoint=endpoint,
+                key=key,
+                request_hash=request_hash,
+                code="logo_version_not_found",
+                message="Logo version not found",
+                status_code=404,
+            )
+
+        duplicate = await session.scalar(
+            select(SavedLogo).where(
+                SavedLogo.customer_id == customer_id,
+                SavedLogo.logo_version_id == logo.id,
+                SavedLogo.id != saved.id,
+            )
+        )
+        if duplicate is not None:
+            return await self._store_error(
+                session,
+                customer_id=customer_id,
+                endpoint=endpoint,
+                key=key,
+                request_hash=request_hash,
+                code="saved_logo_version_exists",
+                message="该版本已经收藏",
+                status_code=409,
+            )
+
+        previous_version_id = saved.logo_version_id
+        saved.logo_version_id = logo.id
+        await session.flush()
+        await self._events.record_audit(
+            session,
+            action="saved_logo.updated",
+            resource_type="saved_logo",
+            resource_id=saved.id,
+            actor_id=customer_id,
+            trace_id=uuid4().hex,
+            summary={"previous_logo_version_id": previous_version_id, "logo_version_id": logo.id},
+        )
+        data = SavedLogoMutationDto(
+            saved_logo=self._saved_logo_dto(saved, logo),
+            created=False,
+        ).model_dump(mode="json")
+        return await self._store_success(
+            session,
+            customer_id=customer_id,
+            endpoint=endpoint,
+            key=key,
+            request_hash=request_hash,
+            status_code=200,
             data=data,
         )
 
