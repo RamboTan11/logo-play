@@ -545,7 +545,11 @@ class BatchGenerationService:
         self, session: AsyncSession, request: GenerationRequest
     ) -> GenerationStatusDto:
         rows = await self._successful_batch_window(session, request)
-        batches = [await self._batch_dto(session, row, request.id) for row in rows]
+        # Anchor each image URL to its own successful batch. Using the
+        # currently polled request as the anchor rewrites every historical
+        # URL after a regeneration and makes an already selected mockup
+        # image restart against a moving endpoint.
+        batches = [await self._batch_dto(session, row, row.id) for row in rows]
         summary = _safe_summary(request.failure_summary_json)
         return GenerationStatusDto(
             request_id=request.id,

@@ -151,6 +151,15 @@ export function GenerationResultsPage() {
     })
   }, [options])
 
+  useEffect(() => {
+    // Keep the selected logo warm before a regeneration can replace the
+    // history payload. This prevents the mockup from flashing a broken image
+    // while the new batch is being polled.
+    if (selectedOption?.imageUrl) {
+      preloadCachedImage(selectedOption.imageUrl, { thumbnail: true, progressive: true })
+    }
+  }, [selectedOption?.imageUrl])
+
   useLayoutEffect(() => {
     const container = historyScrollRef.current
     if (!container) return
@@ -378,7 +387,7 @@ export function GenerationResultsPage() {
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
               <img className="ios-phone-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" loading="eager" decoding="async" />
               <div className="ios-phone-selected-app">
-                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
+                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail progressive loading="eager" /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
                 <span>{batch.domain.split('.')[0].toUpperCase()}</span>
               </div>
             </div>

@@ -196,15 +196,18 @@ const initialActiveGeneration = readActiveGeneration()
 
 export const useGenerationStore = create<GenerationState>((set, get) => {
   let recoverySequence = 0
+  let pollSequence = 0
   const regenerationGate = createSingleFlightGate()
 
   const poll = async (
     active: ActiveGeneration,
     phase: 'creation' | 'regeneration' | 'restore',
+    sequence: number,
   ): Promise<'restored' | 'stale'> => {
     try {
+      if (sequence !== pollSequence) return 'stale'
       const response = await getBatchGenerationStatus(active.requestId, active.submittedAt ?? null)
-      if (get().requestId !== active.requestId) return 'stale'
+      if (sequence !== pollSequence || get().requestId !== active.requestId) return 'stale'
 
       if (isRealStatus(response)) {
         const isProcessing = response.status === 'processing'
@@ -212,7 +215,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           || (phase === 'restore' && active.isRegenerating === true)
         const disposition = resolveGenerationPollDisposition(response.status, phase)
         if (disposition.clearActiveRequest) clearActiveGeneration()
-        if (disposition.restoreLatestSuccessful) {
+        // A terminal restore response already contains the complete history.
+        // Only fall back to the latest endpoint when an old anchor returns no
+        // batches at all; otherwise discarding this response causes the new
+        // batch to appear only after a manual refresh.
+        if (disposition.restoreLatestSuccessful && response.batches.length === 0) {
           set({ requestId: null, isProcessing: false, isRegenerating: false })
           return 'stale'
         }
@@ -238,7 +245,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           useToastStore.getState().showToast(generationSuccessToast())
         }
         if (isProcessing) {
-          window.setTimeout(() => void poll(active, phase), 500)
+          window.setTimeout(() => void poll(active, phase, sequence), 500)
         } else if (response.status === 'failed' && isRegeneration) {
           set({ error: '重新生成失败，已保留原有方案。' })
           useToastStore.getState().showToast('重新生成失败，已保留原有方案。')
@@ -247,7 +254,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       }
 
       if (response.status === 'processing') {
-        window.setTimeout(() => void poll(active, phase), 250)
+        window.setTimeout(() => void poll(active, phase, sequence), 250)
         return 'restored'
       }
       clearActiveGeneration()
@@ -300,7 +307,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       if (phase === 'regeneration') useToastStore.getState().showToast(generationSuccessToast())
       return 'restored'
     } catch (error) {
-      if (get().requestId !== active.requestId) return 'stale'
+      if (sequence !== pollSequence || get().requestId !== active.requestId) return 'stale'
       if (
         phase === 'restore'
         && error instanceof GenerationApiError
@@ -384,7 +391,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       shouldRedirectToResults: false,
       error: null,
     })
-    void poll(active, phase)
+    const pollId = ++pollSequence
+    void poll(active, phase, pollId)
   }
 
   return {
@@ -523,6 +531,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     },
     restoreActiveGeneration: async () => {
       const recoveryId = ++recoverySequence
+      const pollId = ++pollSequence
       try {
         await recoverInitialGeneration({
           readActive: readActiveGeneration,
@@ -534,7 +543,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
               isRegenerating: active.isRegenerating === true,
               error: null,
             })
-            return poll(active, 'restore')
+            return poll(active, 'restore', pollId)
           },
           onNoActive: () => {
             if (recoveryId !== recoverySequence) return
@@ -583,6 +592,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       }
     },
     restoreCompletedBatches: async () => {
+      // An active request must always win over the in-memory history. This is
+      // the normal state while switching between creation and results during
+      // a regeneration.
+      if (readActiveGeneration()) {
+        await get().restoreActiveGeneration()
+        return
+      }
       if (get().batchHistory.length > 0) {
         set({ isCompletedBatchesRestored: true })
         return
@@ -590,6 +606,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       await get().restoreActiveGeneration()
     },
     returnToCreation: () => {
+      recoverySequence += 1
+      pollSequence += 1
       clearActiveGeneration()
       clearGenerationSourceRecovery()
       set({
@@ -605,6 +623,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     },
     clearCustomerState: () => {
       recoverySequence += 1
+      pollSequence += 1
       clearActiveGeneration()
       clearGenerationSourceRecovery()
       set({
