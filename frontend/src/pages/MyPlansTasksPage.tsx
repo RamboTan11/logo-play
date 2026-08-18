@@ -3,7 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, WheelEvent as Reac
 import { createPortal } from 'react-dom'
 import { Smartphone } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
-import { CachedImage } from '../components/CachedImage'
+import { CachedImage, preloadCachedImage, preloadImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
@@ -124,7 +124,7 @@ function SavedLogoCard({ logo, onEdit, onAdopt, onMockupPreview, isAdoptionLocke
   return (
     <article className="saved-logo-card" tabIndex={-1}>
       <div className="saved-logo-image">
-        <CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail />
+        <CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail loading="eager" />
         <div className="saved-logo-mockup-tooltip">
           <button className="saved-logo-mockup-trigger" type="button" aria-label={t('查看 logo 应用样机预览')} onClick={onMockupPreview}>
             <Smartphone size={16} strokeWidth={2.2} aria-hidden="true" />
@@ -152,7 +152,7 @@ function TaskThumbnail({ src, alt, onPreview }: {
   if (!src) return <span className="my-task-empty-cell">-</span>
   return (
     <button className="my-task-image-button" type="button" aria-label={t('预览') + ' ' + alt} onClick={() => onPreview(src, alt)}>
-      <CachedImage src={src} alt={alt} thumbnail />
+      <CachedImage src={src} alt={alt} thumbnail loading="eager" />
     </button>
   )
 }
@@ -168,9 +168,9 @@ function AppMockup({ imageUrl, domain, thumbnail = true, progressive = false, cl
   const appName = domain.split('.')[0]?.toUpperCase() || domain.toUpperCase()
   return (
     <div className={`my-task-mockup ${className}`} role="img" aria-label={`${domain} ${t('应用样机预览')}`}>
-      <img className="my-task-mockup-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" />
+      <img className="my-task-mockup-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" loading="eager" decoding="async" />
       <div className="my-task-mockup-selected-app">
-        <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} progressive={progressive} loading={progressive || !thumbnail ? 'eager' : 'lazy'} /></div>
+        <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} progressive={progressive} loading="eager" /></div>
         <span>{appName}</span>
       </div>
     </div>
@@ -397,6 +397,15 @@ export function MyPlansTasksPage() {
     queueMicrotask(() => void loadPage(active))
     return () => { active.current = false }
   }, [loadPage])
+
+  useEffect(() => {
+    preloadImage(iphoneMockupReferenceUrl)
+    savedLogos.forEach((logo) => preloadCachedImage(logo.image_url, { thumbnail: true }))
+    tasks.slice(0, 12).forEach((task) => {
+      preloadCachedImage(task.adopted_image_url, { thumbnail: true })
+      if (task.delivery_image_url) preloadCachedImage(task.delivery_image_url, { thumbnail: true })
+    })
+  }, [savedLogos, tasks])
 
   const refreshTasks = async () => {
     const nextTasks = await getMyTasks()

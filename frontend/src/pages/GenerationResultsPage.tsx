@@ -8,7 +8,7 @@ import { BatchReplaceConfirmDialog } from '../components/BatchReplaceConfirmDial
 import { GenerationWaitingState } from '../components/GenerationWaitingState'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
-import { CachedImage } from '../components/CachedImage'
+import { CachedImage, preloadCachedImage, preloadImage } from '../components/CachedImage'
 import { LogoArtwork } from '../components/LogoArtwork'
 import { adoptLogo } from '../services/designTasksService'
 import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
@@ -212,6 +212,13 @@ export function GenerationResultsPage() {
     }
   }, [batch, selectedId])
 
+  useEffect(() => {
+    preloadImage(iphoneMockupReferenceUrl)
+    options.forEach((option) => {
+      if (option.imageUrl) preloadCachedImage(option.imageUrl, { thumbnail: true })
+    })
+  }, [options])
+
   const toggleSaved = async (logoVersionId: string) => {
     if (pendingAction || isRegenerating) return
     // The production API creates a saved design but intentionally has no
@@ -394,7 +401,7 @@ export function GenerationResultsPage() {
                       : null
                   }} />
                   <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
-                  {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail /> : <LogoArtwork variant={index + (batch.request_id.length % 6)} domain={batch.domain} />}
+                  {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={index + (batch.request_id.length % 6)} domain={batch.domain} />}
                 </article>
               })}
             </section>
@@ -410,9 +417,9 @@ export function GenerationResultsPage() {
           </> : <>
             <h2>{t('应用样机预览')}</h2>
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
-              <img className="ios-phone-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" />
+              <img className="ios-phone-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" loading="eager" decoding="async" />
               <div className="ios-phone-selected-app">
-                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
+                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
                 <span>{batch.domain.split('.')[0].toUpperCase()}</span>
               </div>
             </div>

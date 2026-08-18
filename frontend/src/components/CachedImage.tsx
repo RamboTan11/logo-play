@@ -3,6 +3,18 @@ import type { ComponentPropsWithoutRef } from 'react'
 
 const imageUrlCache = new Map<string, Promise<string>>()
 
+function decodeObjectUrl(objectUrl: string): Promise<void> {
+  if (typeof Image === 'undefined') return Promise.resolve()
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = objectUrl
+  if (typeof image.decode === 'function') return image.decode().catch(() => undefined)
+  return new Promise((resolve) => {
+    image.onload = () => resolve()
+    image.onerror = () => resolve()
+  })
+}
+
 function cachedImageUrl(source: string): Promise<string> {
   const existing = imageUrlCache.get(source)
   if (existing) return existing
@@ -12,13 +24,31 @@ function cachedImageUrl(source: string): Promise<string> {
       if (!response.ok) throw new Error(`Image request failed with ${response.status}`)
       return response.blob()
     })
-    .then((blob) => URL.createObjectURL(blob))
+    .then((blob) => {
+      const objectUrl = URL.createObjectURL(blob)
+      return decodeObjectUrl(objectUrl).then(() => objectUrl)
+    })
     .catch((error: unknown) => {
       imageUrlCache.delete(source)
       throw error
     })
   imageUrlCache.set(source, pending)
   return pending
+}
+
+export function preloadCachedImage(source: string, options: { thumbnail?: boolean; progressive?: boolean } = {}): void {
+  if (!source.includes('/api/')) return
+  const thumbnailSource = `${source}${source.includes('?') ? '&' : '?'}thumbnail=true`
+  const previewSource = options.thumbnail || options.progressive ? thumbnailSource : source
+  void cachedImageUrl(previewSource)
+  if (options.progressive) void cachedImageUrl(source)
+}
+
+export function preloadImage(source: string): void {
+  if (typeof Image === 'undefined' || !source || source.includes('/api/')) return
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = source
 }
 
 type CachedImageProps = Omit<ComponentPropsWithoutRef<'img'>, 'src' | 'loading'> & {
@@ -97,6 +127,8 @@ export function CachedImage({
   return <img
     ref={imageRef}
     src={resolvedSrc ?? undefined}
+    loading={loading}
+    decoding="async"
     className={`cached-image${loaded ? ' is-loaded' : ''}${className ? ` ${className}` : ''}`}
     aria-busy={!loaded}
     onLoad={(event) => {
