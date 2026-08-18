@@ -1046,6 +1046,13 @@ button:disabled { cursor:not-allowed; opacity:.55; }
   overflow:visible;
 }
 .saved-logo-card .saved-logo-image { border-radius:5px 5px 0 0; }
+.my-plans-section-heading { min-width:0; }
+.my-plans-section-heading p { margin:4px 0 0; color:var(--muted); font-size:12px; line-height:1.45; }
+.saved-logo-mockup-tooltip { position:absolute; z-index:3; top:10px; right:10px; }
+.saved-logo-mockup-trigger { display:grid; width:32px; height:32px; place-items:center; border:1px solid rgba(255,247,239,.62); border-radius:5px; background:rgba(16,6,8,.82); color:var(--gold-bright); padding:0; cursor:pointer; box-shadow:0 5px 14px rgba(0,0,0,.28); }
+.saved-logo-mockup-trigger:hover,.saved-logo-mockup-trigger:focus-visible { border-color:var(--gold-bright); background:rgba(46,11,20,.94); outline:0; box-shadow:0 0 0 2px rgba(247,198,90,.18),0 5px 14px rgba(0,0,0,.28); }
+.saved-logo-mockup-tooltip>span { position:absolute; top:calc(100% + 8px); right:0; width:max-content; max-width:220px; padding:6px 8px; border:1px solid rgba(247,198,90,.34); border-radius:4px; background:#17080d; color:var(--text); font-size:11px; line-height:1.35; opacity:0; visibility:hidden; transform:translateY(-3px); transition:opacity .16s ease,transform .16s ease,visibility .16s ease; pointer-events:none; }
+.saved-logo-mockup-tooltip:hover>span,.saved-logo-mockup-tooltip:focus-within>span { opacity:1; visibility:visible; transform:translateY(0); }
 .task-status.canceled { color:#c8bfc2; border-color:rgba(200,191,194,.34); }
 .task-center-status.canceled { background:#f2f4f7; color:#475467; }
 .saved-logo-card-copy { min-width:0; }

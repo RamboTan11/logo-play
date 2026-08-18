@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any, cast
+from urllib.parse import quote
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -787,7 +788,12 @@ class CustomerDecisionService:
             id=saved.id,
             logo_version_id=logo.id,
             domain=logo.domain,
-            image_url=f"/api/v1/saved-logos/{saved.id}/image/content",
+            # The saved-logo record keeps its stable ID, so the immutable version
+            # must be part of the URL to invalidate the client image Blob cache.
+            image_url=(
+                f"/api/v1/saved-logos/{saved.id}/image/content"
+                f"?version={quote(logo.id, safe='')}"
+            ),
             saved_at=_as_utc(saved.saved_at),
         )
 

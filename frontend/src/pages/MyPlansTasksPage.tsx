@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, WheelEvent as ReactWheelEvent } from 'react'
+import { Smartphone } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { CachedImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
@@ -61,10 +62,11 @@ const adoptTooltip = '采用此方案后，我们会继续完善细节，并向�
 const completedDeliveryTooltip = '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。'
 const taskStatusLoadingTooltip = '正在加载当前任务状态。'
 
-function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked, isAdoptionPending }: {
+function SavedLogoCard({ logo, onEdit, onAdopt, onMockupPreview, isAdoptionLocked, isAdoptionPending }: {
   logo: SavedLogoListItem
   onEdit: () => void
   onAdopt: () => void
+  onMockupPreview: () => void
   isAdoptionLocked: boolean
   isAdoptionPending: boolean
 }) {
@@ -76,7 +78,15 @@ function SavedLogoCard({ logo, onEdit, onAdopt, isAdoptionLocked, isAdoptionPend
     : adoptTooltip
   return (
     <article className="saved-logo-card" tabIndex={-1}>
-      <div className="saved-logo-image"><CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail /></div>
+      <div className="saved-logo-image">
+        <CachedImage src={logo.image_url} alt={logo.domain + ' ' + t('收藏方案')} thumbnail />
+        <div className="saved-logo-mockup-tooltip">
+          <button className="saved-logo-mockup-trigger" type="button" aria-label={t('查看 logo 应用样机预览')} onClick={onMockupPreview}>
+            <Smartphone size={16} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+          <span role="tooltip">{t('查看 logo 应用样机预览')}</span>
+        </div>
+      </div>
       <div className="saved-logo-card-copy"><b>{t('已收藏方案')}</b><span>{logo.domain}</span></div>
       <div className="saved-logo-card-actions">
         <button className="secondary" type="button" aria-label={t('编辑') + ' ' + logo.domain + ' ' + t('收藏方案')} onClick={onEdit}>{t('编辑')}</button>
@@ -103,10 +113,11 @@ function TaskThumbnail({ src, alt, onPreview }: {
   )
 }
 
-function AppMockup({ imageUrl, domain, thumbnail = true, className = '' }: {
+function AppMockup({ imageUrl, domain, thumbnail = true, progressive = false, className = '' }: {
   imageUrl: string
   domain: string
   thumbnail?: boolean
+  progressive?: boolean
   className?: string
 }) {
   const { t } = useClientLanguage()
@@ -115,7 +126,7 @@ function AppMockup({ imageUrl, domain, thumbnail = true, className = '' }: {
     <div className={`my-task-mockup ${className}`} role="img" aria-label={`${domain} ${t('应用样机预览')}`}>
       <img className="my-task-mockup-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" />
       <div className="my-task-mockup-selected-app">
-        <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} loading={thumbnail ? 'lazy' : 'eager'} /></div>
+        <div className="my-task-mockup-selected-icon"><CachedImage src={imageUrl} alt={`${domain} ${t('采用图片')}`} thumbnail={thumbnail} progressive={progressive} loading={progressive || !thumbnail ? 'eager' : 'lazy'} /></div>
         <span>{appName}</span>
       </div>
     </div>
@@ -254,7 +265,7 @@ function MockupPreviewModal({ src, domain, onClose }: { src: string; domain: str
     <div className="my-task-image-preview" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="my-task-mockup-preview-dialog" role="dialog" aria-modal="true" aria-label={`${domain} ${t('应用样机预览')}`}>
         <button ref={closeButtonRef} className="my-task-image-preview-close" type="button" aria-label={t('关闭图片预览')} onClick={onClose}>×</button>
-        <AppMockup imageUrl={src} domain={domain} thumbnail={false} className="my-task-mockup-large" />
+        <AppMockup imageUrl={src} domain={domain} thumbnail progressive className="my-task-mockup-large" />
       </section>
     </div>
   )
@@ -467,7 +478,7 @@ export function MyPlansTasksPage() {
   return (
     <ClientShell>
       <main className="client-main my-plans-main">
-        <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => setEditingSavedLogo(logo)} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
+        <section className="my-plans-section" aria-labelledby="saved-title"><header><div className="my-plans-section-heading"><h2 id="saved-title">{t('收藏方案')}</h2><p>{t('点击图片右上角角标可查看应用样机预览效果')}</p></div></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => setEditingSavedLogo(logo)} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} onMockupPreview={() => setPreviewMockup({ src: logo.image_url, domain: logo.domain })} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
             {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}

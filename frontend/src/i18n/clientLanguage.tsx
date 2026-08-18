@@ -90,6 +90,8 @@ const english: Record<string, string> = {
   '点击候选图查看 iOS App 图标预览并继续操作': 'Select a concept to preview its iOS app icon and continue.',
   'iOS App 图标预览': 'iOS app icon preview',
   '应用样机预览': 'App mockup preview',
+  '查看 logo 应用样机预览': 'View the logo app mockup preview',
+  '点击图片右上角角标可查看应用样机预览效果': 'Click the badge in the top-right corner of an image to preview the logo in an app mockup.',
   '编辑优化': 'Edit and refine',
   '关闭编辑优化': 'Close editor',
   '原图': 'Original',

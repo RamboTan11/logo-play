@@ -84,9 +84,13 @@ async def list_saved_logos(
     principal: CustomerDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
-) -> APIResponse:
+) -> JSONResponse:
     result = await service.list_saved_logos(session, principal.id)
-    return success_response(data=result.model_dump(mode="json"))
+    body = success_response(data=result.model_dump(mode="json"))
+    return JSONResponse(
+        content=body.model_dump(mode="json"),
+        headers={"Cache-Control": "private, no-store", "Pragma": "no-cache"},
+    )
 
 
 @router.patch("/saved-logos/{saved_logo_id}", response_model=None)
