@@ -1285,13 +1285,12 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .batch-history-scroll::-webkit-scrollbar-track { margin:12px 0; border:1px solid rgba(255,255,255,.07); border-radius:999px; background:rgba(255,255,255,.028); backdrop-filter:blur(10px); }
 .batch-history-scroll::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:999px; background:linear-gradient(180deg,rgba(255,237,166,.48),rgba(216,54,93,.38)); background-clip:padding-box; box-shadow:0 0 12px rgba(247,198,90,.2); }
 .batch-history-scroll::-webkit-scrollbar-thumb:hover { background:linear-gradient(180deg,rgba(255,244,196,.82),rgba(234,74,111,.7)); background-clip:padding-box; }
-.batch-history-section { position:relative; min-height:clamp(360px,calc(100vh - 230px),650px); display:flex; flex-direction:column; justify-content:center; padding:20px 0 30px; scroll-margin-block:14px; }
-.batch-history-section-meta { margin:0 auto 8px; color:var(--muted); font-size:11px; letter-spacing:.03em; }
+.batch-history-section { position:relative; display:flex; flex-direction:column; padding:0; scroll-margin-block:14px; }
+.batch-history-section + .batch-history-section { margin-top:28px; }
 .generation-results-stage .results-workspace-grid { width:100%; height:100%; }
 .generation-results-stage .batch-history-frame { box-sizing:border-box; width:min(100%,calc(100vh - 255px),900px); height:auto; aspect-ratio:1 / 1; align-self:center; margin:0 auto; padding-right:0; animation:batch-history-reveal .58s cubic-bezier(.22,.8,.2,1); }
 @keyframes batch-history-reveal { from { opacity:.18; transform:translateY(20px) scale(.97); filter:blur(2px); } to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); } }
 .single-editor-stage { position:relative; }
-.batch-history-generating { min-height:clamp(360px,calc(100vh - 230px),650px); }
 .result-card-generating { display:grid; place-items:center; border-color:rgba(247,198,90,.25); background:linear-gradient(110deg,rgba(26,8,13,.92) 20%,rgba(69,20,33,.68) 45%,rgba(26,8,13,.92) 70%); background-size:220% 100%; animation:loading-shimmer 1.4s linear infinite; }
 .result-card-generating svg { width:28px; height:28px; color:var(--gold-bright); animation:spin .9s linear infinite; filter:drop-shadow(0 0 8px rgba(247,198,90,.45)); }
 .batch-generating-hint { width:100%; margin:12px 0 0; text-align:center; color:var(--gold); font-size:12px; font-weight:600; }
@@ -1351,12 +1350,11 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 @media (max-width:960px) {
   .generation-results-stage { flex:none; width:100%; min-height:420px; }
   .batch-history-scroll { height:100%; padding-right:18px; }
-  .batch-history-section { min-height:420px; }
   .generation-results-stage .results-workspace-grid { height:auto; min-height:420px; }
 }
 @media (max-width:760px) {
-  .generation-results-stage,.batch-history-scroll,.generation-results-stage .results-workspace-grid { min-height:640px; }
-  .batch-history-section { min-height:640px; }
+  .generation-results-stage,.batch-history-scroll { min-height:640px; }
+  .generation-results-stage .batch-history-frame { min-height:0; }
   .saved-logo-grid .saved-logo-card { width:260px; min-width:260px; flex-basis:260px; }
 }
 .result-card-failed {
@@ -1423,6 +1421,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .result-save-icon svg { width:14px; height:14px; }
 .result-workspace-panel { justify-content:flex-start; gap:10px; padding-top:12px; overflow:hidden; }
 .result-workspace-panel>h2 { margin-bottom:2px; }
+.result-workspace-panel .result-workspace-title { max-width:16ch; font-size:20px; line-height:1.5; }
 .result-workspace-guide { max-width:26ch; margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
 .result-regenerate-button { display:inline-flex; width:100%; min-height:42px; align-items:center; justify-content:center; gap:8px; margin-top:8px; }
 .result-domain-hint { display:flex; width:100%; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; margin:2px 0 0; color:var(--muted); font-size:11px; line-height:1.5; text-align:center; }

@@ -336,7 +336,6 @@ export function GenerationResultsPage() {
               }}
             >
               {optionsByBatch.map(({ batch: historyBatch, options: historyOptions }) => <section key={historyBatch.request_id} data-batch-id={historyBatch.request_id} className="batch-history-section" aria-label={t('Logo 方案列表')}>
-                <div className="batch-history-section-meta">{t('历史批次')} {visibleBatches.findIndex((item) => item.request_id === historyBatch.request_id) + 1}</div>
                 <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridCapacityRows() } as CSSProperties}>
                   {historyOptions.map((option, index) => {
                     const retryKey = `${historyBatch.request_id}:${option.slot_index}`
@@ -362,7 +361,6 @@ export function GenerationResultsPage() {
                 </div>
               </section>)}
               {isRegenerating && <section className="batch-history-section batch-history-generating" aria-label={t('正在生成新一批方案')}>
-                <div className="batch-history-section-meta">{t('正在生成新一批方案')}</div>
                 <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridCapacityRows() } as CSSProperties}>
                   {Array.from({ length: Math.max(activeTargetCount ?? batch.target_count, 1) }, (_, index) => <article className="result-card result-card-generating" key={`generating-${index}`} aria-label={`${t('正在生成新一批方案')} ${index + 1}`}>
                     <LoaderCircle aria-hidden="true" />
@@ -375,7 +373,7 @@ export function GenerationResultsPage() {
         </section>
         <aside className="decision-panel result-workspace-panel" aria-live="polite">
           {!selectedOption ? <>
-            <h2>{t('选择一个 Logo 方案')}</h2><p className="result-workspace-guide">{t('点击预览样机效果并选择提交您喜欢的风格')}</p><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
+            <h2 className="result-workspace-title">{t('点击预览样机效果并选择提交您喜欢的风格')}</h2><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
             <button className="secondary result-regenerate-button" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={handleReplaceClick}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
             <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isRegenerating) returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
           </> : <>

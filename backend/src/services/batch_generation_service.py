@@ -530,8 +530,9 @@ class BatchGenerationService:
                 await session.scalars(
                     select(GenerationRequest)
                     .where(
+                        # History belongs to the customer, so switching domains
+                        # never removes older successful logo batches.
                         GenerationRequest.customer_id == anchor.customer_id,
-                        GenerationRequest.domain == anchor.domain,
                         GenerationRequest.created_at <= anchor.created_at,
                         GenerationRequest.status == "succeeded",
                     )
