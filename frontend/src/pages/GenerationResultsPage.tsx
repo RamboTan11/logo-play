@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, RefreshCw, Star } from 'lucide-react'
+import { ArrowLeft, LoaderCircle, RefreshCw, Star } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { BatchReplaceConfirmDialog } from '../components/BatchReplaceConfirmDialog'
@@ -26,74 +26,6 @@ const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
 const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 let rememberedResultSelection: RememberedResultSelection | null = null
-
-function BatchHistoryRail({ activeIndex, total, disabled, onSelect, previousLabel, nextLabel, label }: {
-  activeIndex: number
-  total: number
-  disabled: boolean
-  onSelect: (index: number) => void
-  previousLabel: string
-  nextLabel: string
-  label: string
-}) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const [dragProgress, setDragProgress] = useState<number | null>(null)
-  const progress = dragProgress ?? (total > 1 ? activeIndex / (total - 1) : 0)
-  const progressFromPointer = (clientY: number): number | null => {
-    if (disabled) return null
-    const track = trackRef.current
-    if (!track) return null
-    const bounds = track.getBoundingClientRect()
-    if (bounds.height <= 0) return null
-    return Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height))
-  }
-
-  if (total < 2) return null
-  return <aside
-    className="batch-history-rail"
-    role="scrollbar"
-    aria-label={label}
-    aria-orientation="vertical"
-    aria-valuemin={1}
-    aria-valuemax={total}
-    aria-valuenow={activeIndex + 1}
-    aria-valuetext={`${activeIndex + 1} / ${total}`}
-    tabIndex={disabled ? -1 : 0}
-    onKeyDown={(event) => {
-      if (disabled) return
-      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); onSelect(activeIndex - 1) }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') { event.preventDefault(); onSelect(activeIndex + 1) }
-      if (event.key === 'Home') { event.preventDefault(); onSelect(0) }
-      if (event.key === 'End') { event.preventDefault(); onSelect(total - 1) }
-    }}
-  >
-    <button className="batch-history-step icon-tooltip" type="button" data-tooltip={previousLabel} aria-label={previousLabel} disabled={disabled || activeIndex <= 0} onClick={() => onSelect(activeIndex - 1)}><ChevronUp size={15} aria-hidden="true" /></button>
-    <div
-      className="batch-history-track"
-      ref={trackRef}
-      onPointerDown={(event) => {
-        event.currentTarget.setPointerCapture(event.pointerId)
-        const nextProgress = progressFromPointer(event.clientY)
-        if (nextProgress !== null) setDragProgress(nextProgress)
-      }}
-      onPointerMove={(event) => {
-        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-        const nextProgress = progressFromPointer(event.clientY)
-        if (nextProgress !== null) setDragProgress(nextProgress)
-      }}
-      onPointerUp={(event) => {
-        const nextProgress = progressFromPointer(event.clientY)
-        setDragProgress(null)
-        if (nextProgress !== null) onSelect(Math.round(nextProgress * (total - 1)))
-      }}
-      onPointerCancel={() => setDragProgress(null)}
-    >
-      <span className="batch-history-track-fill" style={{ height: `${progress * 100}%` }} />
-      <span className="batch-history-thumb" style={{ top: `${progress * 100}%` }} aria-hidden="true" />
-    </div>
-    <button className="batch-history-step icon-tooltip" type="button" data-tooltip={nextLabel} aria-label={nextLabel} disabled={disabled || activeIndex >= total - 1} onClick={() => onSelect(activeIndex + 1)}><ChevronDown size={15} aria-hidden="true" /></button>
-  </aside>
-}
 
 function readCandidateOverrides(): Record<string, CandidateOverride> {
   if (typeof window === 'undefined') return {}
@@ -174,7 +106,6 @@ export function GenerationResultsPage() {
   const historyScrollRef = useRef<HTMLDivElement>(null)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
-  const activeBatchIndex = Math.max(0, visibleBatches.findIndex((item) => item.request_id === batch?.request_id))
 
   const optionsByBatch = useMemo(() => visibleBatches.map((item) => ({
     batch: item,
@@ -219,6 +150,12 @@ export function GenerationResultsPage() {
       if (option.imageUrl) preloadCachedImage(option.imageUrl, { thumbnail: true })
     })
   }, [options])
+
+  useLayoutEffect(() => {
+    const container = historyScrollRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  }, [isRegenerating, visibleBatches.length])
 
   const toggleSaved = async (logoVersionId: string) => {
     if (pendingAction || isRegenerating) return
@@ -429,15 +366,6 @@ export function GenerationResultsPage() {
                 <p className="batch-generating-hint">{t('预计需要 1～3 分钟，请稍等。')}</p>
               </section>}
             </div>
-            <BatchHistoryRail activeIndex={activeBatchIndex} total={visibleBatches.length} disabled={isBusy} onSelect={(index) => {
-              const target = visibleBatches[index]
-              const container = historyScrollRef.current
-              const section = target && container?.querySelector<HTMLElement>(`[data-batch-id="${target.request_id}"]`)
-              if (section && container) {
-                const top = section.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-                container.scrollTo({ top, behavior: 'smooth' })
-              }
-            }} previousLabel={t('上一批')} nextLabel={t('下一批')} label={t('生成批次工具')} />
           </div>}
         </section>
         <aside className="decision-panel result-workspace-panel" aria-live="polite">
