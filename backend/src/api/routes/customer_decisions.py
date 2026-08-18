@@ -25,6 +25,7 @@ CustomerDependency = Annotated[
 ]
 DatabaseDependency = Annotated[AsyncSession, Depends(get_db)]
 IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key")]
+_IMMUTABLE_CUSTOMER_IMAGE_CACHE_CONTROL = "private, max-age=900, must-revalidate"
 
 
 def get_customer_decision_service(request: Request) -> CustomerDecisionService:
@@ -132,7 +133,7 @@ async def get_saved_logo_image(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Cache-Control": "private, no-store"},
+        headers={"Cache-Control": _IMMUTABLE_CUSTOMER_IMAGE_CACHE_CONTROL},
     )
 
 

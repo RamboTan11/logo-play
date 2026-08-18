@@ -78,13 +78,15 @@ export function CachedImage({
   const imageRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(loading === 'eager')
   const [loaded, setLoaded] = useState(false)
-  // Let the browser start the authenticated image request immediately. The
-  // Blob/object-URL path is still used for progressive previews, but it must
-  // not delay the first visible pixels of a result card.
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(requestedSrc)
+  // Do not attach a URL for off-screen history images. The result page can
+  // contain many batches, so leaving their src attributes in the DOM causes
+  // browsers to compete with the newest visible batch for bandwidth.
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(
+    loading === 'eager' ? requestedSrc : null,
+  )
 
   useEffect(() => {
-    setResolvedSrc(requestedSrc)
+    setResolvedSrc(loading === 'eager' ? requestedSrc : null)
     setShouldLoad(loading === 'eager')
     setLoaded(false)
   }, [requestedSrc, loading])
@@ -105,7 +107,11 @@ export function CachedImage({
   }, [loading, shouldLoad])
 
   useEffect(() => {
-    if (!shouldLoad || !progressive || !requestedSrc.includes('/api/')) return
+    if (!shouldLoad) return
+    // Render directly first; progressive previews may replace it with a
+    // decoded Blob URL afterwards, without withholding the first pixels.
+    setResolvedSrc(requestedSrc)
+    if (!progressive || !requestedSrc.includes('/api/')) return
     let active = true
     void cachedImageUrl(requestedSrc).then(
       (objectUrl) => { if (active) setResolvedSrc(objectUrl) },

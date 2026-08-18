@@ -69,6 +69,7 @@ ServiceDependency = Annotated[BatchGenerationService, Depends(get_generation_ser
 CustomerAssetDependency = Annotated[AssetService, Depends(get_customer_asset_service)]
 
 _MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024
+_IMMUTABLE_CUSTOMER_IMAGE_CACHE_CONTROL = "private, max-age=900, must-revalidate"
 
 
 def get_single_image_edit_service(request: Request) -> SingleImageEditService:
@@ -347,7 +348,9 @@ async def get_logo_image(
     except BatchGenerationRequestError as error:
         return _request_error_response(error)
     return Response(
-        content=content, media_type=media_type, headers={"Cache-Control": "private, no-store"}
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": _IMMUTABLE_CUSTOMER_IMAGE_CACHE_CONTROL},
     )
 
 

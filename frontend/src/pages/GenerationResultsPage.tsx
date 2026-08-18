@@ -106,6 +106,7 @@ export function GenerationResultsPage() {
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
   const historyScrollRef = useRef<HTMLDivElement>(null)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
+  const newestBatchId = visibleBatches.at(-1)?.request_id ?? null
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
 
   const optionsByBatch = useMemo(() => visibleBatches.map((item) => ({
@@ -346,6 +347,7 @@ export function GenerationResultsPage() {
                     </article>
                     const selected = selectedOption?.id === option.id
                     const saved = option.logoVersionId ? savedIds.has(option.logoVersionId) : false
+                    const isNewestBatch = historyBatch.request_id === newestBatchId
                     return <article className={`result-card ${selected ? 'selected' : ''}`} key={option.id}>
                       <button className="result-select-control" aria-label={selected ? t('取消选择方案') : t('选择方案')} aria-pressed={selected} disabled={isBusy} onClick={() => {
                         const nextSelection = selected ? null : option.id
@@ -355,7 +357,7 @@ export function GenerationResultsPage() {
                           : null
                       }} />
                       <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
-                      {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="lazy" /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
+                      {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading={isNewestBatch ? 'eager' : 'lazy'} fetchPriority={isNewestBatch ? 'high' : 'low'} /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
                     </article>
                   })}
                 </div>
