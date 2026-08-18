@@ -59,7 +59,7 @@ export function DeliveryRatingFloater() {
         <div className="delivery-rating-choices" role="radiogroup" aria-label={t('选择交付评分')} onMouseLeave={() => setHoveredRating(null)}>
           {[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" className={rating <= currentRating ? 'active' : ''} role="radio" aria-checked={deliveredTask.rating === rating} aria-label={`${rating} ${t('分')} - ${t(ratingLabels[rating - 1])}`} disabled={isSubmitting} onMouseEnter={() => setHoveredRating(rating)} onFocus={() => setHoveredRating(rating)} onBlur={() => setHoveredRating(null)} onClick={() => void submitRating(rating)}><Star size={24} fill="currentColor" strokeWidth={1.6} aria-hidden="true" /><span>{rating}</span></button>)}
         </div>
-        <div className="delivery-rating-feedback" aria-live="polite">{isSubmitting ? t('正在收集这份心情...') : saved ? t('已收到，这份评价已记下。') : error ?? (deliveredTask.rating ? t('可以随时重新点亮另一颗星。') : t('点亮一颗星，告诉我们您的真实感受。'))}</div>
+        <div className="delivery-rating-feedback" aria-live="polite">{isSubmitting ? t('正在收集这份心情...') : saved ? t('谢谢您，这份评价我们已记下来了') : error ?? (deliveredTask.rating ? t('可以随时重新点亮另一颗星。') : t('点亮一颗星，告诉我们您的真实感受。'))}</div>
       </div>}
       {!isOpen && <button className="delivery-rating-launcher" type="button" onClick={() => { setIsOpen(true); setSaved(false); setError(null) }}><Star size={17} fill="currentColor" strokeWidth={1.6} aria-hidden="true" /><span>{t(deliveredTask.rating ? '重新评价' : '给这次交付打个分')}</span></button>}
     </aside>

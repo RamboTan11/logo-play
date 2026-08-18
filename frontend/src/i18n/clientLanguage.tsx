@@ -204,7 +204,7 @@ const english: Record<string, string> = {
   '您的评价会帮助我们继续变好': 'Your rating helps us improve the next delivery.',
   '收起评分': 'Collapse rating',
   '正在收集这份心情...': 'Saving your rating...',
-  '已收到，这份评价已记下。': 'Thank you. Your rating has been saved.',
+  '谢谢您，这份评价我们已记下来了': 'Thank you. We have recorded your rating.',
   '可以随时重新点亮另一颗星。': 'You can change your rating at any time.',
   '点亮一颗星，告诉我们您的真实感受。': 'Choose a star to share how this delivery feels.',
   '重新评价': 'Rate again',

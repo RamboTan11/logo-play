@@ -94,8 +94,8 @@ function TaskDetailModal({ task, isBusy, onAccept, onClose, onDownload, onUpload
       <div className="task-detail-body">
         <div className="task-detail-facts"><div className="task-detail-fact"><span>客户名称</span><b>{task.customer_name}</b></div><div className="task-detail-fact"><span>当前状态</span><b>{labels[task.status]}</b></div></div>
         <div className="task-detail-images">
-          <article className="task-detail-image"><div className="task-detail-image-head"><h3>选择方案</h3><button type="button" disabled={isDownloading} aria-label="下载选择方案" title="下载选择方案" onClick={() => { setIsDownloading(true); void onDownload().finally(() => setIsDownloading(false)) }}><Download size={15} aria-hidden="true" /></button></div><div className="task-detail-image-frame"><CachedImage src={task.adopted_image_url} alt="选择方案" draggable title="可拖动图片到支持的应用" loading="eager" onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy' }} /></div></article>
-          <article className="task-detail-image"><div className="task-detail-image-head"><h3>精修终稿</h3></div>{task.delivery_image_url ? <div className="task-detail-image-frame"><CachedImage src={task.delivery_image_url} alt="精修终稿" loading="eager" /></div> : <DeliveryPendingPreview />}</article>
+          <article className="task-detail-image"><div className="task-detail-image-head"><h3>选择方案</h3><button type="button" disabled={isDownloading} aria-label="下载选择方案" title="下载选择方案" onClick={() => { setIsDownloading(true); void onDownload().finally(() => setIsDownloading(false)) }}><Download size={15} aria-hidden="true" /></button></div><div className="task-detail-image-frame"><CachedImage src={task.adopted_image_url} alt="选择方案" draggable title="可拖动图片到支持的应用" loading="eager" thumbnail progressive onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy' }} /></div></article>
+          <article className="task-detail-image"><div className="task-detail-image-head"><h3>精修终稿</h3></div>{task.delivery_image_url ? <div className="task-detail-image-frame"><CachedImage src={task.delivery_image_url} alt="精修终稿" loading="eager" thumbnail progressive /></div> : <DeliveryPendingPreview />}</article>
         </div>
         <div className="task-detail-texts"><div className="task-detail-text"><span>人工精修建议</span><b>{listText(task.adoption_suggestion)}</b></div><div className="task-detail-text"><span>反馈意见</span><b>{listText(task.customer_feedback)}</b></div><div className="task-detail-text"><span>评分</span><b>{task.rating ?? '-'}</b></div></div>
       </div>
@@ -225,16 +225,29 @@ export function TaskCenterPage() {
   const toggleTimePopover = () => { if (isTimeOpen) discardTimeDraft(); else { setDraftRange(dateRange); setDateError(''); setIsTimeOpen(true) } }
   const openTask = useCallback(async (taskId: string) => {
     if (busyTaskId) return
+    openedDeepLinkTaskIdRef.current = taskId
+    const cachedTask = tasks.find((task) => task.id === taskId)
+    if (cachedTask) {
+      // Open the shell immediately from the row data; the detail request only
+      // fills in authoritative image URLs and avoids making the click feel blocked.
+      setSelectedTask({
+        ...cachedTask,
+        adopted_image_url: `/api/v1/design-tasks/${encodeURIComponent(taskId)}/adopted-image/content`,
+        delivery_image_url: cachedTask.status === 'completed'
+          ? `/api/v1/design-tasks/${encodeURIComponent(taskId)}/delivery-image/content`
+          : null,
+      })
+    }
     setBusyTaskId(taskId)
     try {
-      setSelectedTask(await getTaskCenterTask(taskId))
-      openedDeepLinkTaskIdRef.current = taskId
+      const detail = await getTaskCenterTask(taskId)
+      setSelectedTask((current) => current?.id === taskId ? detail : current)
     } catch (error) {
       showToast(errorMessage(error, '任务详情加载失败，请稍后重试。'))
     } finally {
       setBusyTaskId(null)
     }
-  }, [busyTaskId, showToast])
+  }, [busyTaskId, showToast, tasks])
   const deepLinkTaskId = searchParams.get('task_id')
   useEffect(() => {
     if (!deepLinkTaskId) {

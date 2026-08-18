@@ -156,10 +156,11 @@ async def get_adopted_image(
     principal: AdminDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     del principal
     try:
-        media_type, content = await service.read_adopted_image(session, task_id)
+        media_type, content = await service.read_adopted_image(session, task_id, thumbnail=thumbnail)
     except TaskCenterError as error:
         return _error_response(error)
     return Response(content=content, media_type=media_type, headers={"Cache-Control": "private, no-store"})
@@ -171,10 +172,11 @@ async def get_delivery_image(
     principal: AdminDependency,
     session: DatabaseDependency,
     service: ServiceDependency,
+    thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
     del principal
     try:
-        media_type, content = await service.read_delivery_image(session, task_id)
+        media_type, content = await service.read_delivery_image(session, task_id, thumbnail=thumbnail)
     except TaskCenterError as error:
         return _error_response(error)
     return Response(content=content, media_type=media_type, headers={"Cache-Control": "private, no-store"})

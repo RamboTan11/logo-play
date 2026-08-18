@@ -303,16 +303,16 @@ class TaskCenterService:
         return await self._summary_for_task(session, task)
 
     async def read_adopted_image(
-        self, session: AsyncSession, task_id: str
+        self, session: AsyncSession, task_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
         task = await self._task_or_error(session, task_id)
-        return await self._read_asset(session, task.adopted_asset_id)
+        return await self._read_asset(session, task.adopted_asset_id, thumbnail=thumbnail)
 
     async def read_delivery_image(
-        self, session: AsyncSession, task_id: str
+        self, session: AsyncSession, task_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
         task = await self._task_or_error(session, task_id)
-        return await self._read_asset(session, task.delivery_asset_id, delivery=True)
+        return await self._read_asset(session, task.delivery_asset_id, delivery=True, thumbnail=thumbnail)
 
     async def export_tasks(
         self,
@@ -430,7 +430,12 @@ class TaskCenterService:
             raise TaskCenterError("customer_access_unstarted", "Customer access is not started", 409)
 
     async def _read_asset(
-        self, session: AsyncSession, asset_id: str | None, *, delivery: bool = False
+        self,
+        session: AsyncSession,
+        asset_id: str | None,
+        *,
+        delivery: bool = False,
+        thumbnail: bool = False,
     ) -> tuple[str, bytes]:
         if asset_id is None:
             raise TaskCenterError("task_delivery_not_found", "Task delivery image not found", 404)
@@ -439,7 +444,10 @@ class TaskCenterService:
         if asset is None or asset.purpose != expected_purpose:
             raise TaskCenterError("task_delivery_not_found", "Task delivery image not found", 404)
         try:
-            return asset.media_type, self._storage.read(asset.storage_key)
+            content = self._storage.read(asset.storage_key)
+            if thumbnail and self._storage.has_thumbnail(asset.storage_key):
+                return "image/webp", self._storage.read_thumbnail(asset.storage_key, content)
+            return asset.media_type, content
         except OSError as error:
             raise TaskCenterError("task_delivery_not_found", "Task delivery image not found", 404) from error
 
