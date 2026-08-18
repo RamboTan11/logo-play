@@ -1288,7 +1288,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .batch-history-section { position:relative; min-height:clamp(360px,calc(100vh - 230px),650px); display:flex; flex-direction:column; justify-content:center; padding:20px 0 30px; scroll-margin-block:14px; }
 .batch-history-section-meta { margin:0 auto 8px; color:var(--muted); font-size:11px; letter-spacing:.03em; }
 .generation-results-stage .results-workspace-grid { width:100%; height:100%; }
-.generation-results-stage .batch-history-frame { box-sizing:border-box; width:min(100%,calc(150vh - 375px),1020px); height:auto; aspect-ratio:3 / 2; align-self:center; margin:0 auto; padding-right:0; animation:batch-history-reveal .58s cubic-bezier(.22,.8,.2,1); }
+.generation-results-stage .batch-history-frame { box-sizing:border-box; width:min(100%,calc(100vh - 255px),900px); height:auto; aspect-ratio:1 / 1; align-self:center; margin:0 auto; padding-right:0; animation:batch-history-reveal .58s cubic-bezier(.22,.8,.2,1); }
 @keyframes batch-history-reveal { from { opacity:.18; transform:translateY(20px) scale(.97); filter:blur(2px); } to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); } }
 .single-editor-stage { position:relative; }
 .batch-history-generating { min-height:clamp(360px,calc(100vh - 230px),650px); }
@@ -1410,7 +1410,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 @media (max-width:760px) { .delivery-rating-floater { right:16px; bottom:78px; width:min(360px,calc(100vw - 32px)); }.delivery-rating-launcher { margin-left:auto; }.delivery-rating-panel-heading { padding:14px; }.delivery-rating-choices { padding-right:12px; padding-left:12px; } }
 
 /* T-041: P05 keeps comparison and final decisions in the result workspace. */
-.results-workspace-grid { grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:repeat(var(--result-rows,1),minmax(0,1fr)); align-content:stretch; justify-content:stretch; gap:clamp(10px,1.1vw,18px); overflow:hidden; padding:clamp(8px,1.1vw,18px); }
+.results-workspace-grid { grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:repeat(var(--result-rows,3),minmax(0,1fr)); align-content:start; justify-content:stretch; gap:clamp(10px,1.1vw,18px); overflow:hidden; padding:clamp(8px,1.1vw,18px); }
 .results-workspace-grid .result-card { width:100%; height:100%; min-height:0; aspect-ratio:1; }
 .results-workspace-grid .logo-artwork { padding:12px 8px; }
 .results-workspace-grid .logo-artwork svg { width:58px; }

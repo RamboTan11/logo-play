@@ -82,6 +82,7 @@ interface GenerationState {
   requestId: string | null
   isProcessing: boolean
   isRegenerating: boolean
+  activeTargetCount: number | null
   completedGeneration: CompletedGeneration | null
   batchHistory: GenerationBatch[]
   activeBatchId: string | null
@@ -112,6 +113,9 @@ function readActiveGeneration(): ActiveGeneration | null {
     if (!isMockMode) return {
       requestId: parsed.request_id,
       isRegenerating: 'is_regenerating' in parsed && parsed.is_regenerating === true,
+      targetCount: 'target_count' in parsed && typeof parsed.target_count === 'number'
+        ? parsed.target_count
+        : undefined,
     }
     if (
       !('domain' in parsed)
@@ -146,6 +150,7 @@ function writeActiveGeneration(active: ActiveGeneration): void {
     window.localStorage.setItem(activeGenerationStorageKey, JSON.stringify({
       request_id: active.requestId,
       is_regenerating: active.isRegenerating === true,
+      target_count: active.targetCount,
     }))
     return
   }
@@ -234,6 +239,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           requestId: isProcessing ? response.request_id : null,
           isProcessing,
           isRegenerating: isRegeneration && isProcessing,
+          activeTargetCount: isProcessing ? response.target_count : null,
           completedGeneration: batchCompletion(batchWindow.latestBatch ?? undefined),
           batchHistory: batchWindow.batches,
           activeBatchId: batchWindow.activeBatchId,
@@ -267,6 +273,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           requestId: null,
           isProcessing: false,
           isRegenerating: false,
+          activeTargetCount: null,
           isCompletedBatchesRestored: true,
           shouldRedirectToResults: false,
           error: '本批方案生成失败，请稍后重试。',
@@ -297,6 +304,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         requestId: null,
         isProcessing: false,
         isRegenerating: false,
+        activeTargetCount: null,
         completedGeneration: batchCompletion(batch),
         batchHistory: [...prior, batch],
         activeBatchId: batch.request_id,
@@ -321,6 +329,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           requestId: null,
           isProcessing: false,
           isRegenerating: false,
+          activeTargetCount: null,
           completedGeneration: null,
           batchHistory: [],
           activeBatchId: null,
@@ -332,6 +341,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       set({
         isProcessing: false,
         isRegenerating: false,
+        activeTargetCount: null,
         isCompletedBatchesRestored: true,
         error: customerFacingGenerationError(error, '暂时无法查询生成状态，请稍后重试。'),
       })
@@ -372,12 +382,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     const active: ActiveGeneration = {
       requestId: accepted.request_id,
       isRegenerating: phase === 'regeneration',
+      targetCount: accepted.target_count,
       ...(isMockMode ? {
         domain: `${domainLabel}${domainSuffix}`,
         domainLabel,
         domainSuffix,
         submittedAt: Date.now(),
-        targetCount: accepted.target_count,
       } : {}),
     }
     writeActiveGeneration(active)
@@ -385,6 +395,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       requestId: accepted.request_id,
       isProcessing: true,
       isRegenerating: phase === 'regeneration',
+      activeTargetCount: accepted.target_count,
       completedGeneration: phase === 'creation' ? null : get().completedGeneration,
       activeBatchId: phase === 'creation' ? null : get().activeBatchId,
       isCompletedBatchesRestored: phase !== 'creation',
@@ -404,6 +415,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     requestId: initialActiveGeneration?.requestId ?? null,
     isProcessing: initialActiveGeneration !== null,
     isRegenerating: false,
+    activeTargetCount: initialActiveGeneration?.targetCount ?? null,
     completedGeneration: null,
     batchHistory: [],
     activeBatchId: null,
@@ -541,6 +553,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
               requestId: active.requestId,
               isProcessing: true,
               isRegenerating: active.isRegenerating === true,
+              activeTargetCount: active.targetCount ?? null,
               error: null,
             })
             return poll(active, 'restore', pollId)
@@ -554,6 +567,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
               requestId: null,
               isProcessing: false,
               isRegenerating: false,
+              activeTargetCount: null,
               completedGeneration: null,
               batchHistory: [],
               activeBatchId: null,
@@ -618,6 +632,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         error: null,
         requestId: null,
         isProcessing: false,
+        activeTargetCount: null,
         shouldRedirectToResults: false,
       })
     },
@@ -635,6 +650,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         requestId: null,
         isProcessing: false,
         isRegenerating: false,
+        activeTargetCount: null,
         completedGeneration: null,
         batchHistory: [],
         activeBatchId: null,
