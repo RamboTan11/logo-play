@@ -111,8 +111,6 @@ export function GenerationResultsPage() {
     batch: item,
     options: optionsForBatch(item, candidateOverrides),
   })), [candidateOverrides, visibleBatches])
-  const options = optionsByBatch.find((entry) => entry.batch.request_id === batch?.request_id)?.options ?? []
-
   const selectedOption = optionsByBatch
     .flatMap((entry) => entry.options)
     .find((option) => option.id === selectedId && option.status === 'succeeded') ?? null
@@ -146,10 +144,7 @@ export function GenerationResultsPage() {
 
   useEffect(() => {
     preloadImage(iphoneMockupReferenceUrl)
-    options.forEach((option) => {
-      if (option.imageUrl) preloadCachedImage(option.imageUrl, { thumbnail: true })
-    })
-  }, [options])
+  }, [])
 
   useEffect(() => {
     // Keep the selected logo warm before a regeneration can replace the
@@ -360,7 +355,7 @@ export function GenerationResultsPage() {
                           : null
                       }} />
                       <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
-                      {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
+                      {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="lazy" /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
                     </article>
                   })}
                 </div>

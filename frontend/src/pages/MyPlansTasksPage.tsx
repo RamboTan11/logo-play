@@ -3,7 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, WheelEvent as Reac
 import { createPortal } from 'react-dom'
 import { Smartphone } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
-import { CachedImage, preloadCachedImage, preloadImage } from '../components/CachedImage'
+import { CachedImage, preloadImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
@@ -55,14 +55,25 @@ function scrollSavedLogos(event: ReactKeyboardEvent<HTMLDivElement>): void {
   cards[nextIndex].scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
 }
 
-function scrollSavedLogosWithWheel(event: ReactWheelEvent<HTMLDivElement>): void {
+function scheduleSavedLogosWithWheel(
+  event: ReactWheelEvent<HTMLDivElement>,
+  pendingDelta: { current: number },
+  frame: { current: number | null },
+): void {
   const track = event.currentTarget
   if (track.scrollWidth <= track.clientWidth || event.deltaY === 0) return
   const horizontalDelta = event.deltaX || event.deltaY
-  const nextLeft = Math.max(0, Math.min(track.scrollLeft + horizontalDelta, track.scrollWidth - track.clientWidth))
-  if (nextLeft === track.scrollLeft) return
   event.preventDefault()
-  track.scrollLeft = nextLeft
+  event.stopPropagation()
+  pendingDelta.current += horizontalDelta
+  if (frame.current !== null) return
+  frame.current = window.requestAnimationFrame(() => {
+    const delta = pendingDelta.current
+    pendingDelta.current = 0
+    frame.current = null
+    const nextLeft = Math.max(0, Math.min(track.scrollLeft + delta, track.scrollWidth - track.clientWidth))
+    if (nextLeft !== track.scrollLeft) track.scrollLeft = nextLeft
+  })
 }
 
 const adoptTooltip = '采用此方案后，我们会继续完善细节，并向您交付最终图片'
@@ -357,6 +368,8 @@ export function MyPlansTasksPage() {
   const [isUpdatingSuggestion, setIsUpdatingSuggestion] = useState(false)
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [feedbackTask, setFeedbackTask] = useState<MyTaskListItem | null>(null)
+  const savedWheelPendingRef = useRef(0)
+  const savedWheelFrameRef = useRef<number | null>(null)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const showToast = useToastStore((state) => state.showToast)
   const isAdoptionLocked = tasks.some((task) => task.status === 'completed')
@@ -400,12 +413,15 @@ export function MyPlansTasksPage() {
 
   useEffect(() => {
     preloadImage(iphoneMockupReferenceUrl)
-    savedLogos.forEach((logo) => preloadCachedImage(logo.image_url, { thumbnail: true }))
-    tasks.slice(0, 12).forEach((task) => {
-      preloadCachedImage(task.adopted_image_url, { thumbnail: true })
-      if (task.delivery_image_url) preloadCachedImage(task.delivery_image_url, { thumbnail: true })
-    })
-  }, [savedLogos, tasks])
+  }, [])
+
+  useEffect(() => () => {
+    if (savedWheelFrameRef.current !== null) window.cancelAnimationFrame(savedWheelFrameRef.current)
+  }, [])
+
+  const scrollSavedLogosWithWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    scheduleSavedLogosWithWheel(event, savedWheelPendingRef, savedWheelFrameRef)
+  }
 
   const refreshTasks = async () => {
     const nextTasks = await getMyTasks()

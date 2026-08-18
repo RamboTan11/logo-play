@@ -78,12 +78,13 @@ export function CachedImage({
   const imageRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(loading === 'eager')
   const [loaded, setLoaded] = useState(false)
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(() => (
-    requestedSrc.includes('/api/') ? null : requestedSrc
-  ))
+  // Let the browser start the authenticated image request immediately. The
+  // Blob/object-URL path is still used for progressive previews, but it must
+  // not delay the first visible pixels of a result card.
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(requestedSrc)
 
   useEffect(() => {
-    setResolvedSrc(requestedSrc.includes('/api/') ? null : requestedSrc)
+    setResolvedSrc(requestedSrc)
     setShouldLoad(loading === 'eager')
     setLoaded(false)
   }, [requestedSrc, loading])
@@ -104,7 +105,7 @@ export function CachedImage({
   }, [loading, shouldLoad])
 
   useEffect(() => {
-    if (!shouldLoad || !requestedSrc.includes('/api/')) return
+    if (!shouldLoad || !progressive || !requestedSrc.includes('/api/')) return
     let active = true
     void cachedImageUrl(requestedSrc).then(
       (objectUrl) => { if (active) setResolvedSrc(objectUrl) },

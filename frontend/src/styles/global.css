@@ -1306,9 +1306,11 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 }
 .single-editor-waiting-overlay .generation-waiting-state { color:var(--text); text-shadow:0 1px 5px rgba(0,0,0,.9); }
 .saved-logo-grid {
+  box-sizing:border-box;
   display:flex;
   width:100%;
   min-width:0;
+  max-width:100%;
   flex-wrap:nowrap;
   gap:12px;
   overflow-x:auto;
@@ -1316,10 +1318,16 @@ button:disabled { cursor:not-allowed; opacity:.55; }
   padding:4px 4px 12px;
   scroll-snap-type:x proximity;
   overscroll-behavior-inline:contain;
+  overscroll-behavior-x:contain;
+  overscroll-behavior-y:none;
+  overflow-anchor:none;
   touch-action:pan-x;
+  -webkit-overflow-scrolling:touch;
+  will-change:scroll-position;
   scrollbar-width:thin;
   scrollbar-color:rgba(247,198,90,.42) transparent;
   mask-image:linear-gradient(90deg,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%);
+}
 .saved-logo-grid::-webkit-scrollbar { height:6px; }
 .saved-logo-grid::-webkit-scrollbar-track {
   margin-inline:12px;
@@ -1332,7 +1340,6 @@ button:disabled { cursor:not-allowed; opacity:.55; }
   background:rgba(247,198,90,.34);
 }
 .saved-logo-grid::-webkit-scrollbar-thumb:hover { background:rgba(247,198,90,.52); }
-}
 .saved-logo-grid:focus-visible {
   outline:1px solid rgba(247,198,90,.48);
   outline-offset:3px;
