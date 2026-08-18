@@ -1038,6 +1038,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 }
 .global-toast a:hover { color:#a9c5ff; text-decoration:underline; }
 .global-toast a:focus-visible { border-radius:2px; outline:2px solid #a9c5ff; outline-offset:2px; }
+.client-shell .global-toast { z-index:5000; }
 
 .saved-logo-card {
   display:flex;
@@ -1076,6 +1077,10 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .saved-logo-card-actions .adopt-disabled-tooltip>span { top:calc(100% + 8px); right:auto; bottom:auto; left:calc(100% + 8px); width:min(288px,calc(100vw - 36px)); transform:translateY(-3px); }
 .saved-logo-card-actions .adopt-disabled-tooltip:hover>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-within>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-visible>span { transform:translateY(0); }
 .saved-logo-card-actions .adopt-disabled-tooltip:focus-visible>span { opacity:1; visibility:visible; transform:translateY(0); }
+
+/* Keep the delivered-state explanation above the action row so the horizontal plan rail cannot crop it. */
+.saved-logo-card-actions .adopt-disabled-tooltip>span { top:auto; right:0; bottom:calc(100% + 8px); left:auto; z-index:60; transform:translateY(3px); }
+.saved-logo-card-actions .adopt-disabled-tooltip:hover>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-within>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-visible>span { transform:translateY(0); }
 
 .saved-logo-adopt-modal {
   position:fixed;
@@ -1366,6 +1371,18 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .feedback-dialog-body { display:grid; gap:18px; padding:20px; }.feedback-dialog-body label { display:grid; gap:8px; }.feedback-dialog-body label>span,.feedback-label { color:var(--soft); font-size:12px; font-weight:700; }.feedback-dialog textarea { min-height:120px; resize:vertical; border:1px solid var(--line); border-radius:5px; background:#100609; color:var(--text); padding:11px; font:inherit; font-size:13px; line-height:1.55; }.feedback-dialog textarea:focus { border-color:var(--gold-bright); outline:0; box-shadow:0 0 0 2px rgba(247,198,90,.12); }.feedback-dialog-body .delivery-rating { margin-top:8px; }.feedback-dialog-body .delivery-rating button { width:34px; height:34px; font-size:27px; }.feedback-dialog>footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--line-red); }
 .my-plans-table { min-width:1420px; }.my-plans-table th:nth-child(3) { width:14%; }.my-plans-table th:nth-child(4) { width:14%; }.my-plans-table th:nth-child(5) { width:10%; }.my-plans-table th:nth-child(6) { width:8%; }.my-plans-table th:nth-child(10) { width:8%; }.my-task-feedback { white-space:pre-line; }
 .task-center-table { min-width:1260px; }.task-center-table th:nth-child(1) { width:14%; }.task-center-table th:nth-child(2) { width:15%; }.task-center-table th:nth-child(3) { width:14%; }.task-center-table th:nth-child(4) { width:10%; }.task-center-table th:nth-child(5) { width:15%; }.task-center-table th:nth-child(6) { width:15%; }.task-center-table th:nth-child(7) { width:7%; }.task-center-table th:nth-child(8) { width:20%; }
+
+/* T-043: rating is a separate, persistent client-side action after delivery. */
+.delivery-rating-floater { position:fixed; z-index:4300; right:24px; bottom:24px; width:min(360px,calc(100vw - 32px)); color:var(--text); pointer-events:none; }
+.delivery-rating-floater>* { pointer-events:auto; }
+.delivery-rating-launcher { display:flex; align-items:center; gap:8px; min-height:42px; margin-left:auto; border:1px solid rgba(247,198,90,.62); border-radius:999px; background:linear-gradient(135deg,#2b0b13,#16070b); color:#ffe39a; padding:10px 16px; box-shadow:0 16px 36px rgba(0,0,0,.42),0 0 0 1px rgba(247,198,90,.08) inset; font-size:12px; font-weight:800; cursor:pointer; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+.delivery-rating-launcher:hover,.delivery-rating-launcher:focus-visible { border-color:#ffe39a; outline:0; transform:translateY(-2px); box-shadow:0 20px 42px rgba(0,0,0,.5),0 0 22px rgba(247,198,90,.12); }
+.delivery-rating-panel { overflow:hidden; border:1px solid rgba(247,198,90,.48); border-radius:10px; background:linear-gradient(150deg,rgba(43,11,19,.98),rgba(18,6,10,.98)); box-shadow:0 24px 64px rgba(0,0,0,.58),0 0 0 1px rgba(255,255,255,.035) inset; }
+.delivery-rating-panel-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 16px 12px; border-bottom:1px solid rgba(247,198,90,.16); }
+.delivery-rating-panel-heading>div { min-width:0; }.delivery-rating-kicker { display:flex; align-items:center; gap:5px; color:#f7c65a; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }.delivery-rating-panel-heading strong,.delivery-rating-panel-heading small { display:block; }.delivery-rating-panel-heading strong { margin-top:7px; font-size:16px; }.delivery-rating-panel-heading small { margin-top:5px; color:var(--muted); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }.delivery-rating-collapse { display:grid; width:28px; height:28px; flex:none; place-items:center; border:1px solid rgba(247,198,90,.24); border-radius:5px; background:transparent; color:#f7c65a; padding:0; cursor:pointer; }.delivery-rating-collapse:hover,.delivery-rating-collapse:focus-visible { border-color:#f7c65a; outline:0; }
+.delivery-rating-choices { display:flex; justify-content:space-between; gap:4px; padding:16px 18px 10px; }.delivery-rating-choices button { display:grid; justify-items:center; gap:4px; min-width:44px; border:0; background:transparent; color:rgba(220,186,145,.35); padding:0; cursor:pointer; transition:color .16s ease,transform .16s ease; }.delivery-rating-choices button span { color:var(--muted); font-size:10px; }.delivery-rating-choices button.active,.delivery-rating-choices button:hover,.delivery-rating-choices button:focus-visible { color:#ffd66e; }.delivery-rating-choices button:hover,.delivery-rating-choices button:focus-visible { transform:translateY(-3px); outline:0; }.delivery-rating-choices button:disabled { cursor:wait; opacity:.65; }
+.delivery-rating-feedback { min-height:34px; padding:0 18px 14px; color:var(--muted); font-size:11px; line-height:1.45; }.delivery-rating-feedback:empty { display:none; }
+@media (max-width:760px) { .delivery-rating-floater { right:16px; bottom:78px; width:min(360px,calc(100vw - 32px)); }.delivery-rating-launcher { margin-left:auto; }.delivery-rating-panel-heading { padding:14px; }.delivery-rating-choices { padding-right:12px; padding-left:12px; } }
 
 /* T-041: P05 keeps comparison and final decisions in the result workspace. */
 .results-workspace-grid { grid-template-columns:repeat(3,150px); grid-template-rows:repeat(var(--result-rows,1),150px); align-content:center; justify-content:center; gap:14px; overflow:auto; padding:10px; }

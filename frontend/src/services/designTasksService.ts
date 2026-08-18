@@ -1,4 +1,4 @@
-import { adoptLogoMock, getMyTaskMock, getMyTasksMock } from '../mocks/generationsMock'
+import { adoptLogoMock, getMyTaskMock, getMyTasksMock, updateMyTaskFeedbackMock } from '../mocks/generationsMock'
 import type {
   AdoptLogoData,
   ApiResponse,
@@ -88,14 +88,16 @@ export async function getMyTask(taskId: string): Promise<MyTaskDetail> {
 export async function submitTaskFeedback(
   taskId: string,
   feedback: string | null,
-  rating: number | null,
 ): Promise<MyTaskListItem> {
   const normalizedFeedback = feedback?.trim() || null
-  const fingerprint = `feedback:${taskId}:${normalizedFeedback ?? ''}:${rating ?? ''}`
+  const fingerprint = `feedback:${taskId}:${normalizedFeedback ?? ''}`
   try {
+    if (isMockMode) {
+      return (await updateMyTaskFeedbackMock(taskId, { feedback: normalizedFeedback })).data.task
+    }
     const response = await api.patch<ApiResponse<{ task: MyTaskListItem }>>(
       `/v1/my/tasks/${encodeURIComponent(taskId)}/feedback`,
-      { feedback: normalizedFeedback, rating },
+      { feedback: normalizedFeedback },
       { headers: { 'Idempotency-Key': idempotencyKey(fingerprint) } },
     )
     releaseIdempotencyKey(fingerprint)
@@ -103,5 +105,24 @@ export async function submitTaskFeedback(
   } catch (error) {
     if (hasServerResponse(error)) releaseIdempotencyKey(fingerprint)
     throw decisionError(error, 'feedback_submit_failed', '反馈提交失败，请稍后重试。')
+  }
+}
+
+export async function submitTaskRating(taskId: string, rating: number): Promise<MyTaskListItem> {
+  const fingerprint = `rating:${taskId}:${rating}`
+  try {
+    if (isMockMode) {
+      return (await updateMyTaskFeedbackMock(taskId, { rating })).data.task
+    }
+    const response = await api.patch<ApiResponse<{ task: MyTaskListItem }>>(
+      `/v1/my/tasks/${encodeURIComponent(taskId)}/feedback`,
+      { rating },
+      { headers: { 'Idempotency-Key': idempotencyKey(fingerprint) } },
+    )
+    releaseIdempotencyKey(fingerprint)
+    return response.data.data.task
+  } catch (error) {
+    if (hasServerResponse(error)) releaseIdempotencyKey(fingerprint)
+    throw decisionError(error, 'rating_submit_failed', '评分提交失败，请稍后重试。')
   }
 }

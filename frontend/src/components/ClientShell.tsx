@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { GlobalToast } from './GlobalToast'
+import { DeliveryRatingFloater } from './DeliveryRatingFloater'
 import { getLastCreationPath } from '../utils/clientNavigation'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 import { LanguageSwitcher } from './LanguageSwitcher'
@@ -22,6 +23,7 @@ export function ClientShell({ children }: PropsWithChildren) {
         <LanguageSwitcher />
       </header>
       {children}
+      <DeliveryRatingFloater />
       <GlobalToast />
     </div>
   )

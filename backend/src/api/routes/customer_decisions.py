@@ -198,6 +198,8 @@ async def update_my_task_feedback(
             task_id=task_id,
             feedback=payload.feedback,
             rating=payload.rating,
+            feedback_provided="feedback" in payload.model_fields_set,
+            rating_provided="rating" in payload.model_fields_set,
             idempotency_key=idempotency_key,
         )
     except CustomerDecisionError as error:

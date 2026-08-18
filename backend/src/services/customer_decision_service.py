@@ -807,6 +807,8 @@ class CustomerDecisionService:
         task_id: str,
         feedback: str | None,
         rating: int | None,
+        feedback_provided: bool,
+        rating_provided: bool,
         idempotency_key: str,
     ) -> DecisionResult:
         """Persist the latest customer feedback/rating for a delivered task."""
@@ -814,7 +816,10 @@ class CustomerDecisionService:
         key = _normalize_idempotency_key(idempotency_key)
         endpoint = _FEEDBACK_ENDPOINT.format(task_id=task_id)
         normalized_feedback = _normalize_optional_text(feedback)
-        request_hash = _request_hash({"feedback": normalized_feedback, "rating": rating})
+        request_hash = _request_hash({
+            "feedback": normalized_feedback if feedback_provided else "__omitted__",
+            "rating": rating if rating_provided else "__omitted__",
+        })
         replay = await self._replay(session, customer_id, endpoint, key, request_hash)
         if replay is not None:
             return replay
@@ -843,26 +848,38 @@ class CustomerDecisionService:
                 message="Rating must be between 1 and 5", status_code=422,
             )
         now = datetime.now(UTC)
-        task.customer_feedback = normalized_feedback
-        task.rating = rating
+        if feedback_provided:
+            task.customer_feedback = normalized_feedback
+        if rating_provided:
+            task.rating = rating
         task.updated_at = now
         trace_id = uuid4().hex
         await self._events.record_audit(
             session,
-            action="design_task.customer_feedback_submitted",
+            action=(
+                "design_task.customer_feedback_submitted"
+                if feedback_provided
+                else "design_task.customer_rating_submitted"
+            ),
             resource_type="design_task",
             resource_id=task.id,
             actor_id=customer_id,
             trace_id=trace_id,
-            summary={"feedback_present": normalized_feedback is not None, "rating": rating},
+            summary={
+                "feedback_present": task.customer_feedback is not None,
+                "rating": task.rating,
+                "feedback_updated": feedback_provided,
+                "rating_updated": rating_provided,
+            },
         )
-        await self._lark.enqueue_immediate(
-            session,
-            event_type="task.customer_feedback_submitted",
-            task_id=task.id,
-            trace_id=trace_id,
-            payload={"feedback_submitted_at": now.isoformat()},
-        )
+        if feedback_provided:
+            await self._lark.enqueue_immediate(
+                session,
+                event_type="task.customer_feedback_submitted",
+                task_id=task.id,
+                trace_id=trace_id,
+                payload={"feedback_submitted_at": now.isoformat()},
+            )
         delivery_uploaded_at = await session.scalar(
             select(AssetRecord.created_at).where(AssetRecord.asset_id == task.delivery_asset_id)
         )

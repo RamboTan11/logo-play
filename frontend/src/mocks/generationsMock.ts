@@ -347,6 +347,21 @@ export async function getMyTaskMock(taskId: string): Promise<ApiResponse<MyTaskD
   }
 }
 
+export async function updateMyTaskFeedbackMock(taskId: string, patch: { feedback?: string | null; rating?: number }): Promise<ApiResponse<MyTaskDetailData>> {
+  await new Promise((resolve) => window.setTimeout(resolve, 80))
+  const tasks = readMockTasks()
+  const task = tasks.find((item) => item.customer_id === mockCustomerId && item.id === taskId)
+  if (!task) throw new Error('task_not_found')
+  const updated = {
+    ...task,
+    ...(Object.prototype.hasOwnProperty.call(patch, 'feedback') ? { customer_feedback: patch.feedback ?? null } : {}),
+    ...(Object.prototype.hasOwnProperty.call(patch, 'rating') ? { rating: patch.rating ?? null } : {}),
+    updated_at: new Date().toISOString(),
+  }
+  writeMockTasks(tasks.map((item) => item.id === taskId ? updated : item))
+  return getMyTaskMock(taskId)
+}
+
 export async function getTaskCenterTasksMock(): Promise<MockTaskCenterItem[]> {
   await new Promise((resolve) => window.setTimeout(resolve, 80))
   return readMockTasks()

@@ -150,7 +150,9 @@ class LarkNotificationRuleBatchItem(LarkNotificationRuleUpdate):
 
 
 class LarkNotificationRuleBatchUpdate(BaseModel):
-    rules: list[LarkNotificationRuleBatchItem] = Field(min_length=6, max_length=6)
+    rules: list[LarkNotificationRuleBatchItem] = Field(
+        min_length=len(LARK_EVENT_TYPES), max_length=len(LARK_EVENT_TYPES)
+    )
 
     @model_validator(mode="after")
     def complete_unique_event_set(self) -> "LarkNotificationRuleBatchUpdate":

@@ -35,8 +35,10 @@ class TaskFeedbackRequestDto(BaseModel):
 
     @model_validator(mode="after")
     def require_value(self) -> "TaskFeedbackRequestDto":
-        if self.feedback is None and self.rating is None:
+        if not self.model_fields_set:
             raise ValueError("feedback or rating is required")
+        if {"feedback", "rating"}.issubset(self.model_fields_set):
+            raise ValueError("Submit feedback and rating separately")
         return self
 
 
