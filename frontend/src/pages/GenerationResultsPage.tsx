@@ -18,6 +18,7 @@ import { useToastStore } from '../stores/useToastStore'
 import { rememberLastCreationPath } from '../utils/clientNavigation'
 import { resultGridRows } from '../utils/generationResultLayout'
 import { useClientLanguage } from '../i18n/useClientLanguage'
+import type { GenerationBatch } from '../types/api'
 
 type CandidateOverride = { logoVersionId: string; imageUrl: string | null }
 type RememberedResultSelection = { batchId: string; logoVersionId: string }
@@ -106,6 +107,38 @@ function writeCandidateOverrides(overrides: Record<string, CandidateOverride>): 
   if (typeof window !== 'undefined') window.localStorage.setItem(candidateOverrideStorageKey, JSON.stringify(overrides))
 }
 
+type ResultOption = GenerationBatch['candidates'][number] & {
+  id: string
+  logoVersionId: string | null
+  imageUrl: string | null
+  overrideKey: string
+}
+
+function optionsForBatch(batch: GenerationBatch, candidateOverrides: Record<string, CandidateOverride>): ResultOption[] {
+  const source = batch.candidates.length > 0
+    ? [...batch.candidates].sort((left, right) => left.slot_index - right.slot_index)
+    : batch.logo_versions.map((logo, slotIndex) => ({
+      slot_index: slotIndex,
+      status: 'succeeded' as const,
+      logo_version_id: logo.id,
+      image_url: logo.image_url,
+      failure: null,
+      retry_token: null,
+    }))
+  return source.map((candidate) => {
+    const key = `${batch.request_id}:${candidate.slot_index}`
+    const override = candidate.status === 'succeeded' ? candidateOverrides[key] : undefined
+    const logoVersionId = override?.logoVersionId ?? candidate.logo_version_id
+    return {
+      ...candidate,
+      id: logoVersionId ?? `${key}:failed`,
+      logoVersionId,
+      imageUrl: override?.imageUrl ?? candidate.image_url,
+      overrideKey: key,
+    }
+  })
+}
+
 export function GenerationResultsPage() {
   const { t } = useClientLanguage()
   const navigate = useNavigate()
@@ -129,39 +162,20 @@ export function GenerationResultsPage() {
   const [adoptionDialogMode, setAdoptionDialogMode] = useState<'initial' | 'replace' | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
-  const lastBatchIdRef = useRef<string | null>(null)
   const historyWheelAtRef = useRef(0)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
   const activeBatchIndex = Math.max(0, visibleBatches.findIndex((item) => item.request_id === batch?.request_id))
 
-  const options = useMemo(() => {
-    if (!batch) return []
-    const source = batch.candidates.length > 0
-      ? [...batch.candidates].sort((left, right) => left.slot_index - right.slot_index)
-      : batch.logo_versions.map((logo, slotIndex) => ({
-        slot_index: slotIndex,
-        status: 'succeeded' as const,
-        logo_version_id: logo.id,
-        image_url: logo.image_url,
-        failure: null,
-        retry_token: null,
-      }))
-    return source.map((candidate) => {
-      const key = `${batch.request_id}:${candidate.slot_index}`
-      const override = candidate.status === 'succeeded' ? candidateOverrides[key] : undefined
-      const logoVersionId = override?.logoVersionId ?? candidate.logo_version_id
-      return {
-        ...candidate,
-        id: logoVersionId ?? `${key}:failed`,
-        logoVersionId,
-        imageUrl: override?.imageUrl ?? candidate.image_url,
-        overrideKey: key,
-      }
-    })
-  }, [batch, candidateOverrides])
+  const optionsByBatch = useMemo(() => visibleBatches.map((item) => ({
+    batch: item,
+    options: optionsForBatch(item, candidateOverrides),
+  })), [candidateOverrides, visibleBatches])
+  const options = optionsByBatch.find((entry) => entry.batch.request_id === batch?.request_id)?.options ?? []
 
-  const selectedOption = options.find((option) => option.id === selectedId && option.status === 'succeeded') ?? null
+  const selectedOption = optionsByBatch
+    .flatMap((entry) => entry.options)
+    .find((option) => option.id === selectedId && option.status === 'succeeded') ?? null
   const selectedOptionId = selectedOption?.logoVersionId ?? null
 
   useEffect(() => {
@@ -182,13 +196,10 @@ export function GenerationResultsPage() {
       setSelectedId(null)
       return
     }
-    if (rememberedResultSelection?.batchId === batch.request_id) {
+    if (!selectedId && rememberedResultSelection?.batchId === batch.request_id) {
       setSelectedId(rememberedResultSelection.logoVersionId)
-    } else if (lastBatchIdRef.current && lastBatchIdRef.current !== batch.request_id) {
-      setSelectedId(null)
     }
-    lastBatchIdRef.current = batch?.request_id ?? null
-  }, [batch])
+  }, [batch, selectedId])
 
   const toggleSaved = async (logoVersionId: string) => {
     if (pendingAction || isRegenerating) return
