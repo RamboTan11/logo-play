@@ -15,7 +15,7 @@ import { getSavedLogos, saveLogo } from '../services/savedLogosService'
 import { useGenerationStore } from '../stores/useGenerationStore'
 import { useToastStore } from '../stores/useToastStore'
 import { rememberLastCreationPath } from '../utils/clientNavigation'
-import { resultGridCapacityRows } from '../utils/generationResultLayout'
+import { resultGridRows } from '../utils/generationResultLayout'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 import type { GenerationBatch } from '../types/api'
 
@@ -336,7 +336,7 @@ export function GenerationResultsPage() {
               }}
             >
               {optionsByBatch.map(({ batch: historyBatch, options: historyOptions }) => <section key={historyBatch.request_id} data-batch-id={historyBatch.request_id} className="batch-history-section" aria-label={t('Logo 方案列表')}>
-                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridCapacityRows() } as CSSProperties}>
+                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(historyOptions.length) } as CSSProperties}>
                   {historyOptions.map((option, index) => {
                     const retryKey = `${historyBatch.request_id}:${option.slot_index}`
                     const retrying = retryingSlots.includes(retryKey)
@@ -361,7 +361,7 @@ export function GenerationResultsPage() {
                 </div>
               </section>)}
               {isRegenerating && <section className="batch-history-section batch-history-generating" aria-label={t('正在生成新一批方案')}>
-                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridCapacityRows() } as CSSProperties}>
+                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(Math.max(activeTargetCount ?? batch.target_count, 1)) } as CSSProperties}>
                   {Array.from({ length: Math.max(activeTargetCount ?? batch.target_count, 1) }, (_, index) => <article className="result-card result-card-generating" key={`generating-${index}`} aria-label={`${t('正在生成新一批方案')} ${index + 1}`}>
                     <LoaderCircle aria-hidden="true" />
                   </article>)}
