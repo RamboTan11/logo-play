@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Star } from 'lucide-react'
+import { ChevronDown, ChevronUp, RefreshCw, Star } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { BatchReplaceConfirmDialog } from '../components/BatchReplaceConfirmDialog'
@@ -26,6 +26,64 @@ const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
 const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 let rememberedResultSelection: RememberedResultSelection | null = null
+
+function BatchHistoryRail({ activeIndex, total, disabled, onSelect, previousLabel, nextLabel, label }: {
+  activeIndex: number
+  total: number
+  disabled: boolean
+  onSelect: (index: number) => void
+  previousLabel: string
+  nextLabel: string
+  label: string
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const progress = total > 1 ? activeIndex / (total - 1) : 0
+  const selectFromPointer = (clientY: number) => {
+    if (disabled) return
+    const track = trackRef.current
+    if (!track) return
+    const bounds = track.getBoundingClientRect()
+    if (bounds.height <= 0) return
+    onSelect(Math.round(Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height)) * (total - 1)))
+  }
+
+  if (total < 2) return null
+  return <aside
+    className="batch-history-rail"
+    role="scrollbar"
+    aria-label={label}
+    aria-orientation="vertical"
+    aria-valuemin={1}
+    aria-valuemax={total}
+    aria-valuenow={activeIndex + 1}
+    aria-valuetext={`${activeIndex + 1} / ${total}`}
+    tabIndex={disabled ? -1 : 0}
+    onKeyDown={(event) => {
+      if (disabled) return
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); onSelect(activeIndex - 1) }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') { event.preventDefault(); onSelect(activeIndex + 1) }
+      if (event.key === 'Home') { event.preventDefault(); onSelect(0) }
+      if (event.key === 'End') { event.preventDefault(); onSelect(total - 1) }
+    }}
+  >
+    <button className="batch-history-step icon-tooltip" type="button" data-tooltip={previousLabel} aria-label={previousLabel} disabled={disabled || activeIndex <= 0} onClick={() => onSelect(activeIndex - 1)}><ChevronUp size={15} aria-hidden="true" /></button>
+    <div
+      className="batch-history-track"
+      ref={trackRef}
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId)
+        selectFromPointer(event.clientY)
+      }}
+      onPointerMove={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) selectFromPointer(event.clientY)
+      }}
+    >
+      <span className="batch-history-track-fill" style={{ height: `${progress * 100}%` }} />
+      <span className="batch-history-thumb" style={{ top: `${progress * 100}%` }} aria-hidden="true" />
+    </div>
+    <button className="batch-history-step icon-tooltip" type="button" data-tooltip={nextLabel} aria-label={nextLabel} disabled={disabled || activeIndex >= total - 1} onClick={() => onSelect(activeIndex + 1)}><ChevronDown size={15} aria-hidden="true" /></button>
+  </aside>
+}
 
 function readCandidateOverrides(): Record<string, CandidateOverride> {
   if (typeof window === 'undefined') return {}
@@ -72,9 +130,10 @@ export function GenerationResultsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
   const lastBatchIdRef = useRef<string | null>(null)
+  const historyWheelAtRef = useRef(0)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
-  const activeBatchIndex = visibleBatches.findIndex((item) => item.request_id === batch?.request_id)
+  const activeBatchIndex = Math.max(0, visibleBatches.findIndex((item) => item.request_id === batch?.request_id))
 
   const options = useMemo(() => {
     if (!batch) return []
@@ -262,6 +321,15 @@ export function GenerationResultsPage() {
 
   const isFailed = batch.status === 'failed'
   const isBusy = isRegenerating || pendingAction !== null
+  const selectHistoryBatch = (index: number) => {
+    if (isBusy) return
+    const next = visibleBatches[Math.max(0, Math.min(visibleBatches.length - 1, index))]
+    if (next && next.request_id !== batch.request_id) selectBatch(next.request_id)
+  }
+  const scrollHistory = (delta: number) => {
+    if (isBusy || visibleBatches.length < 2 || !delta) return
+    selectHistoryBatch(activeBatchIndex + (delta < 0 ? -1 : 1))
+  }
   return <ClientShell>
     <main className="client-main generation-main">
       <h1 className="sr-only">{t('生成结果')}</h1>
@@ -269,13 +337,16 @@ export function GenerationResultsPage() {
         <section className="generation-results-panel" aria-live="polite">
           <header className="batch-toolbar">
             <button className="toolbar-icon icon-tooltip toolbar-return" data-tooltip={t('返回创作')} aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { returnToCreation(); navigate('/create') }}>←</button>
-            <div className="batch-toolbar-actions" role="toolbar" aria-label={t('生成批次工具')}>
-              <button className="toolbar-icon icon-tooltip" data-tooltip={t('上一批')} aria-label={t('上一批')} title={t('上一批')} disabled={isBusy || activeBatchIndex <= 0} onClick={() => { const previous = visibleBatches[activeBatchIndex - 1]; if (previous) selectBatch(previous.request_id) }}>‹</button>
-              <button className="toolbar-icon icon-tooltip" data-tooltip={t('下一批')} aria-label={t('下一批')} title={t('下一批')} disabled={isBusy || activeBatchIndex < 0 || activeBatchIndex >= visibleBatches.length - 1} onClick={() => { const next = visibleBatches[activeBatchIndex + 1]; if (next) selectBatch(next.request_id) }}>›</button>
-            </div>
           </header>
-          {isFailed && !isRegenerating ? <div className="generation-loading-panel"><b>{t('本批方案未能完整生成')}</b><span>{t('请稍后重新生成。')}</span></div> : <div className="generation-results-stage" aria-busy={isRegenerating}>
-            <section className="results-grid results-workspace-grid" style={{ '--result-rows': resultGridRows(options.length) } as CSSProperties} aria-label={t('Logo 方案列表')}>
+          {isFailed && !isRegenerating ? <div className="generation-loading-panel"><b>{t('本批方案未能完整生成')}</b><span>{t('请稍后重新生成。')}</span></div> : <div className="generation-results-stage" aria-busy={isRegenerating} onWheel={(event) => {
+            if (window.innerWidth <= 960 || isBusy || visibleBatches.length < 2 || event.deltaY === 0) return
+            event.preventDefault()
+            const now = Date.now()
+            if (now - historyWheelAtRef.current < 360) return
+            historyWheelAtRef.current = now
+            scrollHistory(event.deltaY)
+          }}>
+            <section key={batch.request_id} className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(options.length) } as CSSProperties} aria-label={t('Logo 方案列表')}>
               {options.map((option, index) => {
                 const retryKey = `${batch.request_id}:${option.slot_index}`
                 const retrying = retryingSlots.includes(retryKey)
@@ -298,6 +369,7 @@ export function GenerationResultsPage() {
                 </article>
               })}
             </section>
+            <BatchHistoryRail activeIndex={activeBatchIndex} total={visibleBatches.length} disabled={isBusy} onSelect={selectHistoryBatch} previousLabel={t('上一批')} nextLabel={t('下一批')} label={t('生成批次工具')} />
             {isRegenerating && <div className="generation-waiting-overlay"><GenerationWaitingState title={t('正在生成新一批方案')} description={t('正在探索新的设计方向，生成结果会自动显示')} /></div>}
           </div>}
         </section>
