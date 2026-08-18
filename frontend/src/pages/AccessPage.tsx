@@ -7,7 +7,7 @@ import { useClientLanguage } from '../i18n/useClientLanguage'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 
 const messages: Record<Exclude<AccessResult, 'valid'>, { title: string; detail: string }> = {
-  invalid: { title: '访问链接无效', detail: '请确认你打开的是当前有效的访问链接。' },
+  invalid: { title: '访问链接无效', detail: '请确认您打开的是当前有效的访问链接。' },
   unstarted: { title: '访问尚未启用', detail: '当前访问权限尚未开始，请联系项目负责人。' },
   stopped: { title: '访问已关停', detail: '当前访问权限已关停，请联系项目负责人。' },
   expired: { title: '访问链接已到期', detail: '本次访问权限已结束，请联系项目负责人。' },
@@ -60,7 +60,7 @@ export function AccessPage() {
               <LoaderCircle className="access-state-icon access-state-loading" size={24} aria-hidden="true" />
               <h1>{t('正在验证访问')}</h1>
             </div>
-            <p>{t('正在确认你的访问权限，请稍候。')}</p>
+            <p>{t('正在确认您的访问权限，请稍候。')}</p>
           </>}
         </section>
       </main>

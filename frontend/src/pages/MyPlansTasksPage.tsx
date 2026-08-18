@@ -65,7 +65,7 @@ function scrollSavedLogosWithWheel(event: ReactWheelEvent<HTMLDivElement>): void
   track.scrollLeft = nextLeft
 }
 
-const adoptTooltip = '采用此方案后，我们会继续完善细节，并向你交付最终图片'
+const adoptTooltip = '采用此方案后，我们会继续完善细节，并向您交付最终图片'
 const completedDeliveryTooltip = '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。'
 const taskStatusLoadingTooltip = '正在加载当前任务状态。'
 

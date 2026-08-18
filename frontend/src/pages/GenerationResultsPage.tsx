@@ -303,7 +303,7 @@ export function GenerationResultsPage() {
         </section>
         <aside className="decision-panel result-workspace-panel" aria-live="polite">
           {!selectedOption ? <>
-            <h2>{t('选择一个 Logo 方案')}</h2><p className="result-workspace-guide">{t('点击预览样机效果并选择提交您喜欢的风格')}</p><p className="result-workspace-guide">{t('若没有你喜欢的，可以点击下方按钮换一批')}</p>
+            <h2>{t('选择一个 Logo 方案')}</h2><p className="result-workspace-guide">{t('点击预览样机效果并选择提交您喜欢的风格')}</p><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
             <button className="secondary result-regenerate-button" type="button" disabled={isBusy} onClick={() => setIsReplaceConfirmOpen(true)}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
           </> : <>
             <h2>{t('应用样机预览')}</h2>

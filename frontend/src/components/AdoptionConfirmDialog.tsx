@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 
-const adoptTooltip = '采用此方案后，我们会继续完善细节，并向你交付最终图片'
+const adoptTooltip = '采用此方案后，我们会继续完善细节，并向您交付最终图片'
 
 export function AdoptionConfirmDialog({
   domain,
