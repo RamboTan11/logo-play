@@ -38,14 +38,15 @@ function BatchHistoryRail({ activeIndex, total, disabled, onSelect, previousLabe
   label: string
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
-  const progress = total > 1 ? activeIndex / (total - 1) : 0
-  const selectFromPointer = (clientY: number) => {
-    if (disabled) return
+  const [dragProgress, setDragProgress] = useState<number | null>(null)
+  const progress = dragProgress ?? (total > 1 ? activeIndex / (total - 1) : 0)
+  const progressFromPointer = (clientY: number): number | null => {
+    if (disabled) return null
     const track = trackRef.current
-    if (!track) return
+    if (!track) return null
     const bounds = track.getBoundingClientRect()
-    if (bounds.height <= 0) return
-    onSelect(Math.round(Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height)) * (total - 1)))
+    if (bounds.height <= 0) return null
+    return Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height))
   }
 
   if (total < 2) return null
@@ -73,11 +74,20 @@ function BatchHistoryRail({ activeIndex, total, disabled, onSelect, previousLabe
       ref={trackRef}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId)
-        selectFromPointer(event.clientY)
+        const nextProgress = progressFromPointer(event.clientY)
+        if (nextProgress !== null) setDragProgress(nextProgress)
       }}
       onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) selectFromPointer(event.clientY)
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+        const nextProgress = progressFromPointer(event.clientY)
+        if (nextProgress !== null) setDragProgress(nextProgress)
       }}
+      onPointerUp={(event) => {
+        const nextProgress = progressFromPointer(event.clientY)
+        setDragProgress(null)
+        if (nextProgress !== null) onSelect(Math.round(nextProgress * (total - 1)))
+      }}
+      onPointerCancel={() => setDragProgress(null)}
     >
       <span className="batch-history-track-fill" style={{ height: `${progress * 100}%` }} />
       <span className="batch-history-thumb" style={{ top: `${progress * 100}%` }} aria-hidden="true" />
@@ -163,6 +173,7 @@ export function GenerationResultsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
   const historyWheelAtRef = useRef(0)
+  const historyWheelDeltaRef = useRef(0)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
   const activeBatchIndex = Math.max(0, visibleBatches.findIndex((item) => item.request_id === batch?.request_id))
@@ -357,9 +368,12 @@ export function GenerationResultsPage() {
             if (window.innerWidth <= 960 || isBusy || visibleBatches.length < 2 || event.deltaY === 0) return
             event.preventDefault()
             const now = Date.now()
-            if (now - historyWheelAtRef.current < 360) return
+            if (now - historyWheelAtRef.current < 180) return
+            historyWheelDeltaRef.current += event.deltaY
+            if (Math.abs(historyWheelDeltaRef.current) < 56) return
             historyWheelAtRef.current = now
-            scrollHistory(event.deltaY)
+            scrollHistory(historyWheelDeltaRef.current)
+            historyWheelDeltaRef.current = 0
           }}>
             <section key={batch.request_id} className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(options.length) } as CSSProperties} aria-label={t('Logo 方案列表')}>
               {options.map((option, index) => {
@@ -402,7 +416,7 @@ export function GenerationResultsPage() {
               </div>
             </div>
             <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
-            <button className="result-replace-link" type="button" disabled={isBusy} onClick={() => setIsReplaceConfirmOpen(true)}>{t('这批您都不喜欢？换一批')}</button>
+            <button className="result-replace-link" type="button" disabled={isBusy} onClick={() => void replaceBatch()}>{t('这批您都不喜欢？换一批')}</button>
           </>}
         </aside>
       </section>
