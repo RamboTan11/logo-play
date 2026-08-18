@@ -57,7 +57,8 @@ EVENT_COPY = {
     "task.upload_overdue": ("上传图片提醒", "任务接单已超过 {elapsed_hours} 小时，尚未上传交付图片"),
     "task.adoption_changed_before_acceptance": ("方案变更通知", "客户已修改采用方案"),
     "task.adoption_changed_in_progress": ("方案变更通知", "客户已修改采用方案"),
-    "task.delivery_uploaded": ("图片上传成功", "交付图片已上传，任务已完成"),
+    "task.delivery_uploaded": ("图片上传成功", "交付图片已上传，任务已交付"),
+    "task.customer_feedback_submitted": ("用户反馈意见", "客户提交了新的反馈意见"),
 }
 EXPECTED_STATUS = {
     "task.waiting_assignment_overdue": "waiting_assignment",
@@ -904,7 +905,8 @@ class LarkNotificationService:
         self, session: AsyncSession, outbox: NotificationOutbox, now: datetime
     ) -> None:
         task = await session.get(DesignTask, outbox.resource_id)
-        reminder_index = int(_safe_payload(outbox.payload_json).get("reminder_index", 0))
+        payload = _safe_payload(outbox.payload_json)
+        reminder_index = int(payload.get("reminder_index", 0))
         delivery = await session.scalar(
             select(LarkNotificationDelivery).where(
                 LarkNotificationDelivery.outbox_event_id == outbox.event_id
@@ -945,6 +947,8 @@ class LarkNotificationService:
                 domain=task.domain,
                 submitted_at=task.submitted_at,
                 task_url=self._task_login_url(task.id),
+                feedback=(task.customer_feedback or "-") if outbox.event_type == "task.customer_feedback_submitted" else None,
+                feedback_submitted_at=_parse_payload_datetime(payload.get("feedback_submitted_at")),
             )
             attempt = await self._client.send(
                 webhook, _with_signature(card, signing_secret, now)
@@ -1112,6 +1116,8 @@ def build_lark_card(
     domain: str,
     submitted_at: datetime,
     task_url: str,
+    feedback: str | None = None,
+    feedback_submitted_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Compile only the seven confirmed card fields and one URL action."""
 
@@ -1123,13 +1129,16 @@ def build_lark_card(
                 mention_tokens.append(f"<at id={item.open_id}></at>")
                 seen_open_ids.add(item.open_id)
     mention_text = " ".join(mention_tokens) or "无（群通知）"
+    display_time = feedback_submitted_at or submitted_at
     content = (
         f"{subtitle}\n\n"
         f"**@人员：** {mention_text}\n"
         f"**客户名称：** {customer_name}\n"
         f"**域名：** {domain}\n"
-        f"**提交时间：** {_as_utc(submitted_at).astimezone(_BEIJING_TZ).strftime('%Y-%m-%d %H:%M')}"
+        f"**提交时间：** {_as_utc(display_time).astimezone(_BEIJING_TZ).strftime('%Y-%m-%d %H:%M')}"
     )
+    if feedback is not None:
+        content += f"\n**反馈意见：** {feedback or '-'}"
     payload: dict[str, Any] = {
         "msg_type": "interactive",
         "card": {
@@ -1310,3 +1319,12 @@ def _validate_admin_base(value: str) -> str:
 
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _parse_payload_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None

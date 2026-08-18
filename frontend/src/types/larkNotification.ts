@@ -9,6 +9,7 @@ export type LarkEventType =
   | 'task.adoption_changed_before_acceptance'
   | 'task.adoption_changed_in_progress'
   | 'task.delivery_uploaded'
+  | 'task.customer_feedback_submitted'
 
 export interface LarkChannelDto {
   enabled: boolean

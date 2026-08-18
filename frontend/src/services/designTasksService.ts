@@ -84,3 +84,24 @@ export async function getMyTask(taskId: string): Promise<MyTaskDetail> {
     throw failure
   }
 }
+
+export async function submitTaskFeedback(
+  taskId: string,
+  feedback: string | null,
+  rating: number | null,
+): Promise<MyTaskListItem> {
+  const normalizedFeedback = feedback?.trim() || null
+  const fingerprint = `feedback:${taskId}:${normalizedFeedback ?? ''}:${rating ?? ''}`
+  try {
+    const response = await api.patch<ApiResponse<{ task: MyTaskListItem }>>(
+      `/v1/my/tasks/${encodeURIComponent(taskId)}/feedback`,
+      { feedback: normalizedFeedback, rating },
+      { headers: { 'Idempotency-Key': idempotencyKey(fingerprint) } },
+    )
+    releaseIdempotencyKey(fingerprint)
+    return response.data.data.task
+  } catch (error) {
+    if (hasServerResponse(error)) releaseIdempotencyKey(fingerprint)
+    throw decisionError(error, 'feedback_submit_failed', '反馈提交失败，请稍后重试。')
+  }
+}

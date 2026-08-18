@@ -27,6 +27,7 @@ from src.db.migrations import (
     v0020_t028_reminder_pause,
     v0021_t030_lark_mention_all,
     v0022_model_connection_retirement,
+    v0023_task_feedback_rating,
 )
 from src.db.models import Customer, SchemaMigration
 from src.db.session import DatabaseRuntime
@@ -55,6 +56,7 @@ MIGRATIONS = (
     v0020_t028_reminder_pause,
     v0021_t030_lark_mention_all,
     v0022_model_connection_retirement,
+    v0023_task_feedback_rating,
 )
 
 

@@ -202,6 +202,8 @@ export interface MyTaskListItem {
   domain: string
   status: DesignTaskStatus
   adoption_suggestion: string | null
+  customer_feedback: string | null
+  rating: number | null
   submitted_at: string
   adopted_logo_version_id: string
   adopted_image_url: string

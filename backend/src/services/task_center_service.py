@@ -68,6 +68,8 @@ class TaskExportRow:
     domain: str
     submitted_at: datetime
     adoption_suggestion: str | None
+    customer_feedback: str | None
+    rating: int | None
     adopted_image: bytes | None
     delivery_image: bytes | None
     delivery_placeholder: str
@@ -339,6 +341,8 @@ class TaskCenterService:
                     domain=task.domain,
                     submitted_at=_as_utc(task.submitted_at),
                     adoption_suggestion=task.adoption_suggestion,
+                    customer_feedback=task.customer_feedback,
+                    rating=task.rating,
                     adopted_image=adopted_image,
                     delivery_image=delivery_image,
                     delivery_placeholder=(
@@ -457,6 +461,8 @@ class TaskCenterService:
             domain=task.domain,
             status=task.status,
             adoption_suggestion=task.adoption_suggestion,
+            customer_feedback=task.customer_feedback,
+            rating=task.rating,
             submitted_at=_as_utc(task.submitted_at),
             customer_access_status=self._customer_access.derive_status(customer),
         )
@@ -502,7 +508,7 @@ def _xlsx_bytes(rows: list[TaskExportRow]) -> bytes:
     worksheet = workbook.active
     worksheet.title = "任务中心"
     worksheet.freeze_panes = "A2"
-    worksheet.append(["客户名称", "域名", "提交时间", "人工精修建议", "客户选择图片", "精修终稿"])
+    worksheet.append(["客户名称", "域名", "提交时间", "人工精修建议", "客户反馈意见", "评分", "客户选择图片", "精修终稿"])
 
     header_fill = PatternFill("solid", fgColor="E8ECEF")
     header_font = Font(bold=True, color="25313B")
@@ -524,6 +530,8 @@ def _xlsx_bytes(rows: list[TaskExportRow]) -> bytes:
                 row.domain,
                 submitted_at,
                 row.adoption_suggestion or "-",
+                row.customer_feedback or "-",
+                row.rating or "-",
                 None,
                 None,
             ]
@@ -533,18 +541,18 @@ def _xlsx_bytes(rows: list[TaskExportRow]) -> bytes:
             cell.border = border
             cell.alignment = Alignment(vertical="center", wrap_text=True)
         worksheet.cell(row_index, 3).number_format = "yyyy-mm-dd hh:mm"
-        _add_thumbnail(worksheet, row.adopted_image, row_index, 5, "图片不可用", placeholder_fill, border)
+        _add_thumbnail(worksheet, row.adopted_image, row_index, 7, "图片不可用", placeholder_fill, border)
         _add_thumbnail(
             worksheet,
             row.delivery_image,
             row_index,
-            6,
+            8,
             row.delivery_placeholder,
             placeholder_fill,
             border,
         )
 
-    for column, width in {"A": 18, "B": 24, "C": 19, "D": 30, "E": 18, "F": 18}.items():
+    for column, width in {"A": 18, "B": 24, "C": 19, "D": 30, "E": 30, "F": 10, "G": 18, "H": 18}.items():
         worksheet.column_dimensions[column].width = width
     worksheet.row_dimensions[1].height = 24
     worksheet.sheet_view.showGridLines = False

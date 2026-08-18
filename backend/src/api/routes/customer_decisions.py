@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import require_customer_session
 from src.db.session import get_db
-from src.models.customer_decision import AdoptLogoRequestDto, SaveLogoRequestDto, UpdateSavedLogoRequestDto
+from src.models.customer_decision import AdoptLogoRequestDto, SaveLogoRequestDto, TaskFeedbackRequestDto, UpdateSavedLogoRequestDto
 from src.services.auth_service import AuthenticatedPrincipal
 from src.services.customer_decision_service import (
     CustomerDecisionError,
@@ -180,6 +180,29 @@ async def get_my_task(
     except CustomerDecisionError as error:
         return _error_response(error)
     return success_response(data=result.model_dump(mode="json"))
+
+
+@router.patch("/my/tasks/{task_id}/feedback", response_model=None)
+async def update_my_task_feedback(
+    task_id: str,
+    payload: TaskFeedbackRequestDto,
+    idempotency_key: IdempotencyKey,
+    principal: CustomerDependency,
+    session: DatabaseDependency,
+    service: ServiceDependency,
+) -> JSONResponse:
+    try:
+        result = await service.update_task_feedback(
+            session,
+            customer_id=principal.id,
+            task_id=task_id,
+            feedback=payload.feedback,
+            rating=payload.rating,
+            idempotency_key=idempotency_key,
+        )
+    except CustomerDecisionError as error:
+        return _error_response(error)
+    return _decision_response(result)
 
 
 @router.get("/my/tasks/{task_id}/adopted-image/content", response_model=None)

@@ -6,7 +6,7 @@ import { CachedImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
-import { adoptLogo, getMyTask, getMyTasks } from '../services/designTasksService'
+import { adoptLogo, getMyTask, getMyTasks, submitTaskFeedback } from '../services/designTasksService'
 import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
 import { getSavedLogos, updateSavedLogo } from '../services/savedLogosService'
 import { useToastStore } from '../stores/useToastStore'
@@ -21,12 +21,22 @@ const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 const taskStatusLabels = {
   waiting_assignment: '待接单',
   in_progress: '待上传',
-  completed: '已完成',
+  completed: '已交付',
   canceled: '已取消',
 } as const
 
 function displayEmpty(value: string | null): string {
   return value?.trim() || '-'
+}
+
+function TextPreview({ value }: { value: string | null }) {
+  const text = value?.trim() || '-'
+  if (text.length <= 5) return <span>{text}</span>
+  return <span className="list-text-preview" tabIndex={0}>{text.slice(0, 5)}...<span role="tooltip">{text}</span></span>
+}
+
+function RatingStars({ value, onChange, disabled = false }: { value: number | null; onChange?: (value: number) => void; disabled?: boolean }) {
+  return <div className="delivery-rating" role="radiogroup" aria-label="交付评分">{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button" className={rating <= (value ?? 0) ? 'active' : ''} role="radio" aria-checked={value === rating} aria-label={`${rating} 分`} disabled={disabled || !onChange} onClick={() => onChange?.(rating)}>★</button>)}</div>
 }
 
 function canModifySuggestion(task: MyTaskListItem): boolean {
@@ -155,6 +165,7 @@ function TaskRow({
   onModifySuggestion,
   onPreview,
   onMockupPreview,
+  onFeedback,
 }: {
   task: MyTaskListItem
   isOpening: boolean
@@ -163,22 +174,26 @@ function TaskRow({
   onModifySuggestion: (task: MyTaskListItem) => void
   onPreview: (src: string, alt: string) => void
   onMockupPreview: (src: string, domain: string) => void
+  onFeedback: (task: MyTaskListItem) => void
 }) {
   const { t } = useClientLanguage()
   return (
     <tr>
       <td className="my-task-domain"><b>{task.domain}</b></td>
       <td><TaskThumbnail src={task.adopted_image_url} alt={task.domain + ' ' + t('采用图片')} onPreview={onPreview} /></td>
-      <td className="my-task-suggestion">{displayEmpty(task.adoption_suggestion)}</td>
+      <td className="my-task-suggestion"><TextPreview value={task.adoption_suggestion} /></td>
+      <td className="my-task-feedback"><TextPreview value={task.customer_feedback} /></td>
       <td><time dateTime={task.submitted_at}>{formatBeijingDateTime(task.submitted_at)}</time></td>
       <td><span className={'task-status ' + task.status}>{t(taskStatusLabels[task.status])}</span></td>
       <td><TaskThumbnail src={task.delivery_image_url} alt={task.domain + ' ' + t('精修图片')} onPreview={onPreview} /></td>
       <td>{task.delivery_uploaded_at ? <time dateTime={task.delivery_uploaded_at}>{formatBeijingDateTime(task.delivery_uploaded_at)}</time> : '-'}</td>
       <td><TaskMockupThumbnail src={task.delivery_image_url} domain={task.domain} onPreview={onMockupPreview} /></td>
+      <td><RatingStars value={task.rating} /></td>
       <td>
         <div className="my-task-actions">
           <button className="secondary" type="button" disabled={isOpening || isUpdating} onClick={() => onViewDetails(task.id)}>{t(isOpening ? '加载中...' : '查看详情')}</button>
           {canModifySuggestion(task) && <button className="secondary" type="button" disabled={isOpening || isUpdating} onClick={() => onModifySuggestion(task)}>{t(isUpdating ? '提交中...' : '修改建议')}</button>}
+          {task.status === 'completed' && <button className="secondary" type="button" disabled={isOpening || isUpdating} onClick={() => onFeedback(task)}>{t(task.customer_feedback || task.rating ? '修改反馈' : '反馈意见')}</button>}
         </div>
       </td>
     </tr>
@@ -215,7 +230,9 @@ function TaskDetailsModal({ task, onClose }: { task: MyTaskDetail; onClose: () =
           <section className="client-task-snapshot" aria-labelledby="adopted-logo-title"><h3 id="adopted-logo-title">{t('采用图片')}</h3><TaskImage src={task.adopted_image_url} alt={t('采用图片')} /></section>
           <section className="client-task-snapshot" aria-labelledby="delivery-title"><h3 id="delivery-title">{t('精修图片')}</h3>{task.delivery_image_url ? <TaskImage src={task.delivery_image_url} alt={t('精修图片')} /> : <DeliveryPendingPreview />}</section>
           <dl className="client-task-snapshot-context">
-            <div><dt>{t('精修建议')}</dt><dd>{displayEmpty(task.adoption_suggestion)}</dd></div>
+            <div><dt>{t('精修建议')}</dt><dd><TextPreview value={task.adoption_suggestion} /></dd></div>
+            <div><dt>{t('反馈意见')}</dt><dd><TextPreview value={task.customer_feedback} /></dd></div>
+            <div><dt>{t('评分')}</dt><dd><RatingStars value={task.rating} /></dd></div>
             <div><dt>{t('提交时间')}</dt><dd><time dateTime={task.submitted_at}>{formatBeijingDateTime(task.submitted_at)}</time></dd></div>
             <div><dt>{t('上传时间')}</dt><dd>{task.delivery_uploaded_at ? <time dateTime={task.delivery_uploaded_at}>{formatBeijingDateTime(task.delivery_uploaded_at)}</time> : '-'}</dd></div>
           </dl>
@@ -223,6 +240,12 @@ function TaskDetailsModal({ task, onClose }: { task: MyTaskDetail; onClose: () =
       </section>
     </div>
   )
+}
+
+function FeedbackDialog({ task, busy, onClose, onSubmit }: { task: MyTaskListItem; busy: boolean; onClose: () => void; onSubmit: (feedback: string, rating: number | null) => void }) {
+  const [feedback, setFeedback] = useState(task.customer_feedback ?? '')
+  const [rating, setRating] = useState<number | null>(task.rating)
+  return <div className="feedback-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><section className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><header><div><h2 id="feedback-title">交付反馈</h2><p>{task.domain} · 可随时修改</p></div><button type="button" aria-label="关闭" disabled={busy} onClick={onClose}>×</button></header><div className="feedback-dialog-body"><label><span>反馈意见</span><textarea maxLength={4000} value={feedback} disabled={busy} onChange={(event) => setFeedback(event.target.value)} placeholder="请输入您的反馈意见" /></label><div><span className="feedback-label">交付评分</span><RatingStars value={rating} onChange={setRating} disabled={busy} /></div></div><footer><button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</button><button className="primary" type="button" disabled={busy || (rating === null && !feedback.trim())} onClick={() => onSubmit(feedback, rating)}>{busy ? '提交中...' : '保存反馈'}</button></footer></section></div>
 }
 
 function ImagePreviewModal({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -302,6 +325,8 @@ export function MyPlansTasksPage() {
   const [taskBeingModified, setTaskBeingModified] = useState<MyTaskListItem | null>(null)
   const [isUpdatingSuggestion, setIsUpdatingSuggestion] = useState(false)
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
+  const [feedbackTask, setFeedbackTask] = useState<MyTaskListItem | null>(null)
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const showToast = useToastStore((state) => state.showToast)
   const isAdoptionLocked = tasks.some((task) => task.status === 'completed')
   const hasActiveTask = tasks.some((task) => task.status === 'waiting_assignment' || task.status === 'in_progress')
@@ -424,6 +449,19 @@ export function MyPlansTasksPage() {
     }
   }
 
+  const updateFeedback = async (feedback: string, rating: number | null) => {
+    if (!feedbackTask || isSubmittingFeedback) return
+    setIsSubmittingFeedback(true)
+    try {
+      const updated = await submitTaskFeedback(feedbackTask.id, feedback, rating)
+      setTasks((current) => current.map((task) => task.id === updated.id ? updated : task))
+      setFeedbackTask(null)
+      showToast(t('反馈意见已保存'))
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('反馈提交失败，请稍后重试。'))
+    } finally { setIsSubmittingFeedback(false) }
+  }
+
   const generateSavedLogoEdit = async (instruction: string): Promise<ResultEditVersion | null> => {
     if (!editingSavedLogo || isEditingSavedLogo) return null
     setIsEditingSavedLogo(true)
@@ -481,7 +519,7 @@ export function MyPlansTasksPage() {
         <section className="my-plans-section" aria-labelledby="saved-title"><header><div className="my-plans-section-heading"><h2 id="saved-title">{t('收藏方案')}</h2><p>{t('点击图片右上角角标可查看应用样机预览效果')}</p></div></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => setEditingSavedLogo(logo)} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} onMockupPreview={() => setPreviewMockup({ src: logo.image_url, domain: logo.domain })} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
-            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
+            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '反馈意见', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '评分', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} onFeedback={setFeedbackTask} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
           </section>
       </main>
       {detailLoadError && <section className="my-plans-detail-error" role="alert" aria-live="polite"><p>{detailLoadError.message}</p><button className="secondary" type="button" onClick={() => void openTask(detailLoadError.taskId)} disabled={openingTaskId === detailLoadError.taskId}>{t('重试')}</button></section>}
@@ -491,6 +529,7 @@ export function MyPlansTasksPage() {
       {editingSavedLogo && <ResultEditDialog domain={editingSavedLogo.domain} source={{ id: editingSavedLogo.logo_version_id, imageUrl: editingSavedLogo.image_url }} variant={0} isPageBusy={isEditingSavedLogo} onClose={() => setEditingSavedLogo(null)} onGenerate={generateSavedLogoEdit} onUse={useEditedSavedLogo} />}
       {adoptingSavedLogo && <AdoptionConfirmDialog domain={adoptingSavedLogo.domain} initialSuggestion="" isChange={isChangingActiveTask} isSubmitting={isAdoptingSavedLogo} onClose={() => { setAdoptingSavedLogo(null); setIsChangingActiveTask(false) }} onConfirm={(suggestion) => void adoptSavedLogo(suggestion)} />}
       {taskBeingModified && <AdoptionConfirmDialog domain={taskBeingModified.domain} initialSuggestion={taskBeingModified.adoption_suggestion ?? ''} isChange isSubmitting={isUpdatingSuggestion} errorMessage={suggestionError} onClose={() => { setTaskBeingModified(null); setSuggestionError(null) }} onConfirm={(suggestion) => void updateSuggestion(suggestion)} />}
+      {feedbackTask && <FeedbackDialog task={feedbackTask} busy={isSubmittingFeedback} onClose={() => setFeedbackTask(null)} onSubmit={(feedback, rating) => void updateFeedback(feedback, rating)} />}
     </ClientShell>
   )
 }

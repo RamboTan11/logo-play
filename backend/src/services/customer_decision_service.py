@@ -24,6 +24,7 @@ from src.models.customer_decision import (
     DesignTaskListDto,
     DesignTaskMutationDto,
     DesignTaskSummaryDto,
+    TaskFeedbackMutationDto,
     SavedLogoDto,
     SavedLogoListDto,
     SavedLogoMutationDto,
@@ -36,6 +37,7 @@ from src.services.lark_notification_service import LarkWorkflowService
 _SAVE_ENDPOINT = "POST /api/v1/saved-logos"
 _UPDATE_SAVED_ENDPOINT = "PATCH /api/v1/saved-logos/{saved_logo_id}"
 _ADOPT_ENDPOINT = "POST /api/v1/design-tasks/adopt"
+_FEEDBACK_ENDPOINT = "PATCH /api/v1/my/tasks/{task_id}/feedback"
 
 
 class CustomerDecisionError(RuntimeError):
@@ -797,6 +799,81 @@ class CustomerDecisionService:
             saved_at=_as_utc(saved.saved_at),
         )
 
+    async def update_task_feedback(
+        self,
+        session: AsyncSession,
+        *,
+        customer_id: str,
+        task_id: str,
+        feedback: str | None,
+        rating: int | None,
+        idempotency_key: str,
+    ) -> DecisionResult:
+        """Persist the latest customer feedback/rating for a delivered task."""
+
+        key = _normalize_idempotency_key(idempotency_key)
+        endpoint = _FEEDBACK_ENDPOINT.format(task_id=task_id)
+        normalized_feedback = _normalize_optional_text(feedback)
+        request_hash = _request_hash({"feedback": normalized_feedback, "rating": rating})
+        replay = await self._replay(session, customer_id, endpoint, key, request_hash)
+        if replay is not None:
+            return replay
+        task = await session.scalar(
+            select(DesignTask).where(
+                DesignTask.id == task_id,
+                DesignTask.customer_id == customer_id,
+            )
+        )
+        if task is None:
+            return await self._store_error(
+                session, customer_id=customer_id, endpoint=endpoint, key=key,
+                request_hash=request_hash, code="design_task_not_found",
+                message="Design task not found", status_code=404,
+            )
+        if task.status != "completed":
+            return await self._store_error(
+                session, customer_id=customer_id, endpoint=endpoint, key=key,
+                request_hash=request_hash, code="task_not_delivered",
+                message="Feedback is available after delivery", status_code=409,
+            )
+        if rating is not None and not 1 <= rating <= 5:
+            return await self._store_error(
+                session, customer_id=customer_id, endpoint=endpoint, key=key,
+                request_hash=request_hash, code="rating_invalid",
+                message="Rating must be between 1 and 5", status_code=422,
+            )
+        now = datetime.now(UTC)
+        task.customer_feedback = normalized_feedback
+        task.rating = rating
+        task.updated_at = now
+        trace_id = uuid4().hex
+        await self._events.record_audit(
+            session,
+            action="design_task.customer_feedback_submitted",
+            resource_type="design_task",
+            resource_id=task.id,
+            actor_id=customer_id,
+            trace_id=trace_id,
+            summary={"feedback_present": normalized_feedback is not None, "rating": rating},
+        )
+        await self._lark.enqueue_immediate(
+            session,
+            event_type="task.customer_feedback_submitted",
+            task_id=task.id,
+            trace_id=trace_id,
+            payload={"feedback_submitted_at": now.isoformat()},
+        )
+        delivery_uploaded_at = await session.scalar(
+            select(AssetRecord.created_at).where(AssetRecord.asset_id == task.delivery_asset_id)
+        )
+        data = TaskFeedbackMutationDto(
+            task=self._task_summary(task, delivery_uploaded_at)
+        ).model_dump(mode="json")
+        return await self._store_success(
+            session, customer_id=customer_id, endpoint=endpoint, key=key,
+            request_hash=request_hash, status_code=200, data=data,
+        )
+
     @staticmethod
     def _task_summary(
         task: DesignTask,
@@ -807,6 +884,8 @@ class CustomerDecisionService:
             domain=task.domain,
             status=cast(Any, task.status),
             adoption_suggestion=task.adoption_suggestion,
+            customer_feedback=task.customer_feedback,
+            rating=task.rating,
             submitted_at=_as_utc(task.submitted_at),
             adopted_logo_version_id=cast(str, task.adopted_logo_version_id),
             adopted_image_url=f"/api/v1/my/tasks/{task.id}/adopted-image/content",

@@ -41,6 +41,8 @@ interface MockDesignTask {
   initial_single_edit_version_id: string
   ai_edit_inputs: string[]
   adoption_suggestion: string | null
+  customer_feedback: string | null
+  rating: number | null
   delivery_image: { filename: string; media_type: 'image/png' | 'image/jpeg' } | null
   delivery_uploaded_at: string | null
 }
@@ -72,19 +74,19 @@ const mockPrimaryTasks: MockDesignTask[] = [
   {
     id: 'mock-task-waiting', customer_id: mockCustomerId, domain: 'aurora-play.com', status: 'waiting_assignment',
     submitted_at: '2026-07-29T02:00:00.000Z', updated_at: '2026-07-29T02:00:00.000Z', adopted_logo_version_id: 'seed-aurora-v1',
-    initial_single_edit_version_id: 'seed-aurora-v1', ai_edit_inputs: [], adoption_suggestion: null, delivery_image: null,
+    initial_single_edit_version_id: 'seed-aurora-v1', ai_edit_inputs: [], adoption_suggestion: null, customer_feedback: null, rating: null, delivery_image: null,
     delivery_uploaded_at: null,
   },
   {
     id: 'mock-task-progress', customer_id: mockCustomerId, domain: 'coastline.dev', status: 'in_progress',
     submitted_at: '2026-07-29T01:30:00.000Z', updated_at: '2026-07-29T03:10:00.000Z', adopted_logo_version_id: 'seed-coastline-v2',
-    initial_single_edit_version_id: 'seed-coastline-v1', ai_edit_inputs: ['让图形更简洁，增强科技感'], adoption_suggestion: '保留简洁的几何关系。', delivery_image: null,
+    initial_single_edit_version_id: 'seed-coastline-v1', ai_edit_inputs: ['让图形更简洁，增强科技感'], adoption_suggestion: '保留简洁的几何关系。', customer_feedback: null, rating: null, delivery_image: null,
     delivery_uploaded_at: null,
   },
   {
     id: 'mock-task-completed', customer_id: mockCustomerId, domain: 'northstar.studio', status: 'completed',
     submitted_at: '2026-07-28T09:00:00.000Z', updated_at: '2026-07-28T12:20:00.000Z', adopted_logo_version_id: 'seed-northstar-v2',
-    initial_single_edit_version_id: 'seed-northstar-v1', ai_edit_inputs: [], adoption_suggestion: null, delivery_image: { filename: 'northstar-logo-delivery.png', media_type: 'image/png' },
+    initial_single_edit_version_id: 'seed-northstar-v1', ai_edit_inputs: [], adoption_suggestion: null, customer_feedback: '整体很棒，感谢交付。', rating: 5, delivery_image: { filename: 'northstar-logo-delivery.png', media_type: 'image/png' },
     delivery_uploaded_at: '2026-07-28T12:20:00.000Z',
   },
 ]
@@ -109,6 +111,8 @@ const mockTaskCenterBoundaryTasks: MockDesignTask[] = Array.from({ length: 28 },
     initial_single_edit_version_id: `mock-admin-${sequence}-v1`,
     ai_edit_inputs: index % 4 === 0 ? ['强化图形识别度'] : [],
     adoption_suggestion: index % 2 === 0 ? `精简方案 ${sequence} 的细节。` : null,
+    customer_feedback: null,
+    rating: null,
     delivery_image: status === 'completed' ? { filename: `brand-${sequence}-delivery.jpg`, media_type: 'image/jpeg' } : null,
     delivery_uploaded_at: status === 'completed' ? submittedAt : null,
   }
@@ -305,6 +309,8 @@ export async function getMyTasksMock(): Promise<ApiResponse<MyTasksData>> {
       status: task.status,
       submitted_at: task.submitted_at,
       adoption_suggestion: task.adoption_suggestion,
+      customer_feedback: task.customer_feedback,
+      rating: task.rating,
       adopted_logo_version_id: task.adopted_logo_version_id,
       adopted_image_url: seededDeliveryImage,
       delivery_image_url: deliveryImageUrl(task),
@@ -326,6 +332,8 @@ export async function getMyTaskMock(taskId: string): Promise<ApiResponse<MyTaskD
         domain: task.domain,
         status: task.status,
         adoption_suggestion: task.adoption_suggestion,
+        customer_feedback: task.customer_feedback,
+        rating: task.rating,
         submitted_at: task.submitted_at,
         adopted_logo_version_id: task.adopted_logo_version_id,
         adopted_image_url: seededDeliveryImage,
@@ -409,6 +417,8 @@ export async function adoptLogoMock(
     initial_single_edit_version_id: context.initialLogoVersionId,
     ai_edit_inputs: [...context.aiEditInputs],
     adoption_suggestion: request.adoption_suggestion,
+    customer_feedback: null,
+    rating: null,
   }
   const submittedAt = new Date().toISOString()
   const taskId = `mock-task-${Date.now()}`
@@ -430,7 +440,7 @@ export async function adoptLogoMock(
     code: 201,
     message: active.length > 0 ? '已变更采用方案' : '已采用方案',
     data: {
-      task: { id: taskId, domain, status: 'waiting_assignment', adoption_suggestion: request.adoption_suggestion, submitted_at: submittedAt, adopted_logo_version_id: request.logo_version_id, adopted_image_url: seededDeliveryImage, delivery_image_url: null, delivery_uploaded_at: null },
+      task: { id: taskId, domain, status: 'waiting_assignment', adoption_suggestion: request.adoption_suggestion, customer_feedback: null, rating: null, submitted_at: submittedAt, adopted_logo_version_id: request.logo_version_id, adopted_image_url: seededDeliveryImage, delivery_image_url: null, delivery_uploaded_at: null },
       created: true,
     },
   }

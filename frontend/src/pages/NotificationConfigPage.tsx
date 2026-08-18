@@ -72,7 +72,8 @@ const ruleDefinitions: RuleDefinition[] = [
   { eventType: 'task.upload_overdue', title: '上传图片提醒', subtitle: (hours) => `任务接单已超过 ${hours || '-'} 小时，尚未上传交付图片`, description: '进入处理中后超过阈值仍未上传图片', overdue: true, groupOnly: false },
   { eventType: 'task.adoption_changed_before_acceptance', title: '方案变更通知', subtitle: () => '客户已修改采用方案', description: '后台接单前，客户修改采用方案', overdue: false, groupOnly: false },
   { eventType: 'task.adoption_changed_in_progress', title: '方案变更通知', subtitle: () => '客户已修改采用方案', description: '后台接单后、上传图片前，客户修改采用方案', overdue: false, groupOnly: false },
-  { eventType: 'task.delivery_uploaded', title: '图片上传成功', subtitle: () => '交付图片已上传，任务已完成', description: '后台上传交付图片后仅通知群聊', overdue: false, groupOnly: true },
+  { eventType: 'task.delivery_uploaded', title: '图片上传成功', subtitle: () => '交付图片已上传，任务已交付', description: '后台上传交付图片后仅通知群聊', overdue: false, groupOnly: true },
+  { eventType: 'task.customer_feedback_submitted', title: '用户反馈意见', subtitle: () => '客户提交了新的反馈意见', description: '客户可在已交付任务中提交或修改反馈意见', overdue: false, groupOnly: false },
 ]
 
 const defaultRules = ruleDefinitions.reduce<Record<LarkEventType, RuleDraft>>((result, definition) => {

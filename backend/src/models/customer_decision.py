@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 DesignTaskStatus = Literal["waiting_assignment", "in_progress", "completed", "canceled"]
 CustomerAccessStatus = Literal["unstarted", "active", "stopped", "expired"]
@@ -25,6 +25,19 @@ class AdoptLogoRequestDto(BaseModel):
     logo_version_id: str = Field(min_length=1, max_length=64)
     adoption_suggestion: str | None = Field(default=None, max_length=4000)
     confirm_replace_active_task: bool = False
+
+
+class TaskFeedbackRequestDto(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    feedback: str | None = Field(default=None, max_length=4000)
+    rating: int | None = Field(default=None, ge=1, le=5)
+
+    @model_validator(mode="after")
+    def require_value(self) -> "TaskFeedbackRequestDto":
+        if self.feedback is None and self.rating is None:
+            raise ValueError("feedback or rating is required")
+        return self
 
 
 class SavedLogoDto(BaseModel):
@@ -50,6 +63,8 @@ class DesignTaskSummaryDto(BaseModel):
     domain: str
     status: DesignTaskStatus
     adoption_suggestion: str | None
+    customer_feedback: str | None
+    rating: int | None
     submitted_at: datetime
     adopted_logo_version_id: str
     adopted_image_url: str
@@ -71,6 +86,10 @@ class DesignTaskMutationDto(BaseModel):
     created: bool
 
 
+class TaskFeedbackMutationDto(BaseModel):
+    task: DesignTaskSummaryDto
+
+
 class DesignTaskListDto(BaseModel):
     items: list[DesignTaskSummaryDto]
     total: int
@@ -86,6 +105,8 @@ class AdminDesignTaskListItemDto(BaseModel):
     domain: str
     status: DesignTaskStatus
     adoption_suggestion: str | None
+    customer_feedback: str | None
+    rating: int | None
     submitted_at: datetime
     customer_access_status: CustomerAccessStatus
 

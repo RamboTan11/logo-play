@@ -181,7 +181,7 @@ const english: Record<string, string> = {
   '操作': 'Actions',
   '待接单': 'Awaiting assignment',
   '待上传': 'Awaiting upload',
-  '已完成': 'Completed',
+  '已交付': 'Delivered',
   '已取消': 'Canceled',
   '已收藏方案': 'Saved design',
   '编辑': 'Edit',

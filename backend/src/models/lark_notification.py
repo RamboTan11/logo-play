@@ -13,6 +13,7 @@ LarkEventType = Literal[
     "task.adoption_changed_before_acceptance",
     "task.adoption_changed_in_progress",
     "task.delivery_uploaded",
+    "task.customer_feedback_submitted",
 ]
 LARK_EVENT_TYPES: tuple[LarkEventType, ...] = (
     "task.adoption_submitted",
@@ -21,6 +22,7 @@ LARK_EVENT_TYPES: tuple[LarkEventType, ...] = (
     "task.adoption_changed_before_acceptance",
     "task.adoption_changed_in_progress",
     "task.delivery_uploaded",
+    "task.customer_feedback_submitted",
 )
 DeliveryStatus = Literal["accepted", "retrying", "failed"]
 

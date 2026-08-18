@@ -304,6 +304,8 @@ class DesignTask(Base):
     domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     adoption_suggestion: Mapped[str | None] = mapped_column(Text)
+    customer_feedback: Mapped[str | None] = mapped_column(Text)
+    rating: Mapped[int | None] = mapped_column(Integer)
     adopted_logo_version_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("logo_versions.id", ondelete="RESTRICT")
     )

@@ -9,6 +9,8 @@ export interface TaskCenterItem {
   domain: string
   status: TaskCenterStatus
   adoption_suggestion: string | null
+  customer_feedback: string | null
+  rating: number | null
   submitted_at: string
   customer_access_status: CustomerAccessStatus
 }
