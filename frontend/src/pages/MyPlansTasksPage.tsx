@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, WheelEvent as ReactWheelEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ClientShell } from '../components/ClientShell'
 import { CachedImage } from '../components/CachedImage'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
+import { ResultEditDialog } from '../components/ResultEditDialog'
+import type { ResultEditVersion } from '../components/ResultEditDialog'
 import { adoptLogo, getMyTask, getMyTasks } from '../services/designTasksService'
+import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
 import { getSavedLogos } from '../services/savedLogosService'
 import { useToastStore } from '../stores/useToastStore'
 import type { MyTaskDetail, MyTaskListItem, SavedLogoListItem } from '../types/api'
@@ -13,6 +15,7 @@ import { useClientLanguage } from '../i18n/useClientLanguage'
 
 const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
 const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
+const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 
 const taskStatusLabels = {
   waiting_assignment: '待接单',
@@ -269,7 +272,6 @@ function TasksLoading() {
 
 export function MyPlansTasksPage() {
   const { t } = useClientLanguage()
-  const navigate = useNavigate()
   const [savedLogos, setSavedLogos] = useState<SavedLogoListItem[]>([])
   const [tasks, setTasks] = useState<MyTaskListItem[]>([])
   const [isSavedLogosLoading, setIsSavedLogosLoading] = useState(true)
@@ -283,6 +285,8 @@ export function MyPlansTasksPage() {
   const [previewMockup, setPreviewMockup] = useState<{ src: string; domain: string } | null>(null)
   const [adoptingSavedLogo, setAdoptingSavedLogo] = useState<SavedLogoListItem | null>(null)
   const [isAdoptingSavedLogo, setIsAdoptingSavedLogo] = useState(false)
+  const [editingSavedLogo, setEditingSavedLogo] = useState<SavedLogoListItem | null>(null)
+  const [isEditingSavedLogo, setIsEditingSavedLogo] = useState(false)
   const [isChangingActiveTask, setIsChangingActiveTask] = useState(false)
   const [taskBeingModified, setTaskBeingModified] = useState<MyTaskListItem | null>(null)
   const [isUpdatingSuggestion, setIsUpdatingSuggestion] = useState(false)
@@ -409,10 +413,55 @@ export function MyPlansTasksPage() {
     }
   }
 
+  const generateSavedLogoEdit = async (instruction: string): Promise<ResultEditVersion | null> => {
+    if (!editingSavedLogo || isEditingSavedLogo) return null
+    setIsEditingSavedLogo(true)
+    try {
+      let sourceVersionId = editingSavedLogo.logo_version_id
+      if (!isMockMode) {
+        const context = await getSingleEditContext(sourceVersionId)
+        sourceVersionId = context.current_version_id
+        if (sourceVersionId !== editingSavedLogo.logo_version_id) {
+          const current = context.versions.find((version) => version.id === sourceVersionId)
+          if (current) {
+            setEditingSavedLogo((existing) => existing && existing.id === editingSavedLogo.id
+              ? { ...existing, logo_version_id: current.id, image_url: current.image_url }
+              : existing)
+          }
+        }
+      }
+      const accepted = await createSingleEditGeneration(
+        sourceVersionId,
+        instruction.trim() || defaultEditInstruction,
+      )
+      if (isMockMode) return { id: accepted.request_id, imageUrl: null }
+      for (;;) {
+        const status = await getSingleEditStatus(accepted.request_id)
+        if (status.status === 'processing') {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 600))
+          continue
+        }
+        if (status.status !== 'succeeded') throw new Error(t('新版本生成失败，请稍后重试。'))
+        const current = status.versions.find((version) => version.id === status.current_version_id)
+        return current ? { id: current.id, imageUrl: current.image_url } : null
+      }
+    } finally {
+      setIsEditingSavedLogo(false)
+    }
+  }
+
+  const useEditedSavedLogo = (version: ResultEditVersion) => {
+    if (!editingSavedLogo) return
+    setSavedLogos((current) => current.map((logo) => logo.id === editingSavedLogo.id
+      ? { ...logo, logo_version_id: version.id, image_url: version.imageUrl ?? logo.image_url }
+      : logo))
+    setEditingSavedLogo(null)
+  }
+
   return (
     <ClientShell>
       <main className="client-main my-plans-main">
-        <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => navigate('/edit/' + encodeURIComponent(logo.logo_version_id))} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
+        <section className="my-plans-section" aria-labelledby="saved-title"><header><h2 id="saved-title">{t('收藏方案')}</h2></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => setEditingSavedLogo(logo)} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
             {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
@@ -422,6 +471,7 @@ export function MyPlansTasksPage() {
       {selectedTask && <TaskDetailsModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
       {previewImage && <ImagePreviewModal src={previewImage.src} alt={previewImage.alt} onClose={() => setPreviewImage(null)} />}
       {previewMockup && <MockupPreviewModal src={previewMockup.src} domain={previewMockup.domain} onClose={() => setPreviewMockup(null)} />}
+      {editingSavedLogo && <ResultEditDialog domain={editingSavedLogo.domain} source={{ id: editingSavedLogo.logo_version_id, imageUrl: editingSavedLogo.image_url }} variant={0} isPageBusy={isEditingSavedLogo} onClose={() => setEditingSavedLogo(null)} onGenerate={generateSavedLogoEdit} onUse={useEditedSavedLogo} />}
       {adoptingSavedLogo && <AdoptionConfirmDialog domain={adoptingSavedLogo.domain} initialSuggestion="" isChange={isChangingActiveTask} isSubmitting={isAdoptingSavedLogo} onClose={() => { setAdoptingSavedLogo(null); setIsChangingActiveTask(false) }} onConfirm={(suggestion) => void adoptSavedLogo(suggestion)} />}
       {taskBeingModified && <AdoptionConfirmDialog domain={taskBeingModified.domain} initialSuggestion={taskBeingModified.adoption_suggestion ?? ''} isChange isSubmitting={isUpdatingSuggestion} errorMessage={suggestionError} onClose={() => { setTaskBeingModified(null); setSuggestionError(null) }} onConfirm={(suggestion) => void updateSuggestion(suggestion)} />}
     </ClientShell>

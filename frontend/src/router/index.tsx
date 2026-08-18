@@ -2,7 +2,6 @@ import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AccessPage } from '../pages/AccessPage'
 import { CreationPage } from '../pages/CreationPage'
 import { GenerationResultsPage } from '../pages/GenerationResultsPage'
-import { SingleImageEditPage } from '../pages/SingleImageEditPage'
 import { MyPlansTasksPage } from '../pages/MyPlansTasksPage'
 import { TaskCenterPage } from '../pages/TaskCenterPage'
 import { ModelConnectionsPage } from '../pages/ModelConnectionsPage'
@@ -19,7 +18,7 @@ export const router = createBrowserRouter([
   { path: '/access', element: <AccessPage /> },
   { path: '/create', element: <ProtectedRoute><CreationPage /></ProtectedRoute> },
   { path: '/results', element: <ProtectedRoute><GenerationResultsPage /></ProtectedRoute> },
-  { path: '/edit/:versionId', element: <ProtectedRoute><SingleImageEditPage /></ProtectedRoute> },
+  { path: '/edit/:versionId', element: <ProtectedRoute><Navigate to="/my-plans" replace /></ProtectedRoute> },
   { path: '/my-plans', element: <ProtectedRoute><MyPlansTasksPage /></ProtectedRoute> },
   { path: '/my-plans/tasks/:taskId', element: <Navigate to="/my-plans" replace /> },
   { path: '/admin/login', element: <AdminLoginPage /> },

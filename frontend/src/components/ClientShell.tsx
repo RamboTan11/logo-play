@@ -8,7 +8,7 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 export function ClientShell({ children }: PropsWithChildren) {
   const { pathname } = useLocation()
   const { t } = useClientLanguage()
-  const isCreation = pathname === '/create' || pathname === '/results' || pathname.startsWith('/edit/')
+  const isCreation = pathname === '/create' || pathname === '/results'
   const isMyPlans = pathname.startsWith('/my-plans')
 
   return (

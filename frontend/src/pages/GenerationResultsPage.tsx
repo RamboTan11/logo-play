@@ -22,7 +22,7 @@ import { useClientLanguage } from '../i18n/useClientLanguage'
 type CandidateOverride = { logoVersionId: string; imageUrl: string | null }
 type RememberedResultSelection = { batchId: string; logoVersionId: string }
 
-const defaultEditInstruction = '在保持当前品牌方向的基础上优化细节。'
+const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
 const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 let rememberedResultSelection: RememberedResultSelection | null = null

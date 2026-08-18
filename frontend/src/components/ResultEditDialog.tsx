@@ -79,7 +79,7 @@ export function ResultEditDialog({
         <div className="result-edit-body" aria-busy={isGenerating}>
           {!generated ? <>
             <section><h3>{t('原图')}</h3>{renderArtwork(source, t('原图'), variant)}</section>
-            <label className="adoption-note-field result-edit-instruction"><span>{t('优化要求（选填）')}</span><textarea value={instruction} disabled={isGenerating || isPageBusy} placeholder={t('可输入优化要求，默认优化为行业品牌特色的立体效果。')} onChange={(event) => setInstruction(event.target.value)} /></label>
+            <label className="adoption-note-field result-edit-instruction"><span>{t('优化需求（选填）')}</span><textarea value={instruction} disabled={isGenerating || isPageBusy} placeholder={t('可输入您的优化需求，默认重新生成当前相似风格的 logo 图。')} onChange={(event) => setInstruction(event.target.value)} /></label>
           </> : <section className="result-edit-comparison" aria-label={t('原图与新图对比')}>
             <div><h3>{t('原图')}</h3>{renderArtwork(source, t('原图'), variant)}</div>
             <div><h3>{t('新图')}</h3>{renderArtwork(generated, t('新图'), variant + 1)}</div>
