@@ -461,7 +461,7 @@ class BatchGenerationService:
             )
 
     async def status_for_customer(self, customer_id: str, request_id: str) -> GenerationStatusDto:
-        """Return request status plus the two latest successful result batches."""
+        """Return request status plus the customer's complete successful history."""
 
         async with get_db_context(self._runtime) as session:
             request = await session.get(GenerationRequest, request_id)
@@ -480,7 +480,7 @@ class BatchGenerationService:
     async def latest_successful_for_customer(
         self, customer_id: str
     ) -> GenerationStatusDto | None:
-        """Return the customer's newest successful request and its bounded result window."""
+        """Return the customer's newest successful request and complete result history."""
 
         async with get_db_context(self._runtime) as session:
             request = await session.scalar(
@@ -499,7 +499,7 @@ class BatchGenerationService:
     async def read_logo_image(
         self, customer_id: str, window_anchor_request_id: str, logo_version_id: str, *, thumbnail: bool = False
     ) -> tuple[str, bytes]:
-        """Read one result only when it belongs to the two-successful-batch window."""
+        """Read one result only when it belongs to the customer's successful history."""
 
         async with get_db_context(self._runtime) as session:
             anchor = await session.get(GenerationRequest, window_anchor_request_id)
@@ -535,12 +535,11 @@ class BatchGenerationService:
                         GenerationRequest.created_at <= anchor.created_at,
                         GenerationRequest.status == "succeeded",
                     )
-                    .order_by(GenerationRequest.created_at.desc(), GenerationRequest.id.desc())
-                    .limit(2)
+                    .order_by(GenerationRequest.created_at.asc(), GenerationRequest.id.asc())
                 )
             ).all()
         )
-        return list(reversed(rows))
+        return rows
 
     async def _status_dto(
         self, session: AsyncSession, request: GenerationRequest

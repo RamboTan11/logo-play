@@ -13,7 +13,7 @@ export function GenerationWaitingState({ title, description }: GenerationWaiting
     <div className="generation-waiting-copy">
       <b className="loading-copy">{title}<span className="loading-ellipsis" aria-hidden="true" /></b>
       <span>{description}</span>
-      <small>{t('预计需 1～3 分钟，请稍等')}</small>
+      <small>{t('预计需要 1～3 分钟，请稍等。')}</small>
     </div>
     <div className="generation-waiting-track" aria-hidden="true"><span /></div>
   </div>

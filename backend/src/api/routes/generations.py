@@ -306,7 +306,7 @@ async def get_latest_successful_generation(
     principal: CustomerDependency,
     service: ServiceDependency,
 ) -> APIResponse:
-    """Return the latest successful generation without exposing broader history."""
+    """Return the latest successful generation and its complete customer history."""
 
     latest = await service.latest_successful_for_customer(principal.id)
     data = LatestSuccessfulGenerationDto(latest=latest)
@@ -319,7 +319,7 @@ async def get_generation_status(
     principal: CustomerDependency,
     service: ServiceDependency,
 ) -> APIResponse | JSONResponse:
-    """Return request status and only the two latest successful result batches."""
+    """Return request status and the complete successful result history."""
 
     try:
         result = await service.status_for_customer(principal.id, request_id)
@@ -338,7 +338,7 @@ async def get_logo_image(
     service: ServiceDependency,
     thumbnail: bool = Query(False),
 ) -> Response | JSONResponse:
-    """Read an image only through a customer-owned two-successful-batch window."""
+    """Read an image only through the authenticated customer's successful history."""
 
     try:
         media_type, content = await service.read_logo_image(

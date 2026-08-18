@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronUp, RefreshCw, Star } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, RefreshCw, Star } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { BatchReplaceConfirmDialog } from '../components/BatchReplaceConfirmDialog'
-import { GenerationWaitingState } from '../components/GenerationWaitingState'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
 import { CachedImage, preloadCachedImage, preloadImage } from '../components/CachedImage'
@@ -172,8 +171,7 @@ export function GenerationResultsPage() {
   const [adoptionDialogMode, setAdoptionDialogMode] = useState<'initial' | 'replace' | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
-  const historyWheelAtRef = useRef(0)
-  const historyWheelDeltaRef = useRef(0)
+  const historyScrollRef = useRef<HTMLDivElement>(null)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const batch = visibleBatches.find((item) => item.request_id === activeBatchId) ?? visibleBatches.at(-1) ?? null
   const activeBatchIndex = Math.max(0, visibleBatches.findIndex((item) => item.request_id === batch?.request_id))
@@ -188,6 +186,9 @@ export function GenerationResultsPage() {
     .flatMap((entry) => entry.options)
     .find((option) => option.id === selectedId && option.status === 'succeeded') ?? null
   const selectedOptionId = selectedOption?.logoVersionId ?? null
+  const selectedBatch = selectedOption
+    ? visibleBatches.find((item) => item.request_id === selectedOption.overrideKey.split(':')[0]) ?? batch
+    : null
 
   useEffect(() => {
     rememberLastCreationPath('/results')
@@ -324,16 +325,18 @@ export function GenerationResultsPage() {
       return next
     })
     setSelectedId(version.id)
-    rememberedResultSelection = { batchId: batch!.request_id, logoVersionId: version.id }
+    rememberedResultSelection = { batchId: selectedBatch?.request_id ?? batch!.request_id, logoVersionId: version.id }
     setIsEditOpen(false)
   }
 
-  const replaceBatch = async () => {
+  const replaceBatch = async (preserveSelection = false) => {
     const previousSelection = selectedId
     const previousRememberedSelection = rememberedResultSelection
     setIsReplaceConfirmOpen(false)
-    setSelectedId(null)
-    rememberedResultSelection = null
+    if (!preserveSelection) {
+      setSelectedId(null)
+      rememberedResultSelection = null
+    }
     await regenerate()
     if (useGenerationStore.getState().error) {
       setSelectedId(previousSelection)
@@ -349,15 +352,16 @@ export function GenerationResultsPage() {
   }
 
   const isFailed = batch.status === 'failed'
-  const isBusy = isRegenerating || pendingAction !== null
-  const selectHistoryBatch = (index: number) => {
-    if (isBusy) return
-    const next = visibleBatches[Math.max(0, Math.min(visibleBatches.length - 1, index))]
-    if (next && next.request_id !== batch.request_id) selectBatch(next.request_id)
-  }
-  const scrollHistory = (delta: number) => {
-    if (isBusy || visibleBatches.length < 2 || !delta) return
-    selectHistoryBatch(activeBatchIndex + (delta < 0 ? -1 : 1))
+  const isBusy = pendingAction !== null
+  const replaceBusy = isRegenerating || pendingAction !== null
+  const replaceDisabled = pendingAction !== null && !isRegenerating
+  const handleReplaceClick = () => {
+    if (isRegenerating) {
+      showToast(t('正在执行生图任务，请稍后。'))
+      return
+    }
+    if (pendingAction) return
+    requestReplaceBatch()
   }
   const requestReplaceBatch = () => {
     if (selectedOptionId) setIsReplaceConfirmOpen(true)
@@ -369,51 +373,78 @@ export function GenerationResultsPage() {
       <section className="generation-workspace">
         <section className="generation-results-panel" aria-live="polite">
           <header className="batch-toolbar">
-            <button className="toolbar-icon icon-tooltip toolbar-return" data-tooltip={t('返回创作')} aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { returnToCreation(); navigate('/create') }}>←</button>
+            <button className="toolbar-icon icon-tooltip toolbar-return" data-tooltip={t('返回创作')} aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isRegenerating) returnToCreation(); navigate('/create') }}>←</button>
           </header>
-          {isFailed && !isRegenerating ? <div className="generation-loading-panel"><b>{t('本批方案未能完整生成')}</b><span>{t('请稍后重新生成。')}</span></div> : <div className="generation-results-stage" aria-busy={isRegenerating} onWheel={(event) => {
-            if (window.innerWidth <= 960 || isBusy || visibleBatches.length < 2 || event.deltaY === 0) return
-            event.preventDefault()
-            const now = Date.now()
-            if (now - historyWheelAtRef.current < 180) return
-            historyWheelDeltaRef.current += event.deltaY
-            if (Math.abs(historyWheelDeltaRef.current) < 56) return
-            historyWheelAtRef.current = now
-            scrollHistory(historyWheelDeltaRef.current)
-            historyWheelDeltaRef.current = 0
-          }}>
-            <section key={batch.request_id} className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(options.length) } as CSSProperties} aria-label={t('Logo 方案列表')}>
-              {options.map((option, index) => {
-                const retryKey = `${batch.request_id}:${option.slot_index}`
-                const retrying = retryingSlots.includes(retryKey)
-                if (option.status === 'failed') return <article className="result-card result-card-failed" key={option.id}>
-                  <button className={retrying ? 'result-slot-retry loading' : 'result-slot-retry'} aria-label={`${t('重试失败方案')} ${option.slot_index + 1}`} title={t('重试此方案')} disabled={retrying || !option.retry_token || isBusy} onClick={() => option.retry_token && void retrySlot(batch.request_id, option.slot_index, option.retry_token)}><RefreshCw aria-hidden="true" /></button>
-                  <span>{t('此方案生成失败，请重试。')}</span>
-                </article>
-                const selected = selectedOption?.id === option.id
-                const saved = option.logoVersionId ? savedIds.has(option.logoVersionId) : false
-                return <article className={`result-card ${selected ? 'selected' : ''}`} key={option.id}>
-                  <button className="result-select-control" aria-label={selected ? t('取消选择方案') : t('选择方案')} aria-pressed={selected} disabled={isBusy} onClick={() => {
-                    const nextSelection = selected ? null : option.id
-                    setSelectedId(nextSelection)
-                    rememberedResultSelection = nextSelection
-                      ? { batchId: batch.request_id, logoVersionId: nextSelection }
-                      : null
-                  }} />
-                  <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
-                  {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={index + (batch.request_id.length % 6)} domain={batch.domain} />}
-                </article>
-              })}
-            </section>
-            <BatchHistoryRail activeIndex={activeBatchIndex} total={visibleBatches.length} disabled={isBusy} onSelect={selectHistoryBatch} previousLabel={t('上一批')} nextLabel={t('下一批')} label={t('生成批次工具')} />
-            {isRegenerating && <div className="generation-waiting-overlay"><GenerationWaitingState title={t('正在生成新一批方案')} description={t('正在探索新的设计方向，生成结果会自动显示')} /></div>}
+          {isFailed && !isRegenerating ? <div className="generation-loading-panel"><b>{t('本批方案未能完整生成')}</b><span>{t('请稍后重新生成。')}</span></div> : <div className="generation-results-stage" aria-busy={isRegenerating}>
+            <div
+              className="batch-history-scroll"
+              ref={historyScrollRef}
+              onScroll={(event) => {
+                const container = event.currentTarget
+                const center = container.scrollTop + container.clientHeight / 2
+                const containerTop = container.getBoundingClientRect().top
+                let closest: { id: string; distance: number } | null = null
+                for (const section of container.querySelectorAll<HTMLElement>('[data-batch-id]')) {
+                  const sectionTop = section.getBoundingClientRect().top - containerTop + container.scrollTop
+                  const sectionCenter = sectionTop + section.offsetHeight / 2
+                  const candidate = { id: section.dataset.batchId ?? '', distance: Math.abs(sectionCenter - center) }
+                  if (candidate.id && (!closest || candidate.distance < closest.distance)) closest = candidate
+                }
+                if (closest && closest.id !== activeBatchId) selectBatch(closest.id)
+              }}
+            >
+              {optionsByBatch.map(({ batch: historyBatch, options: historyOptions }) => <section key={historyBatch.request_id} data-batch-id={historyBatch.request_id} className="batch-history-section" aria-label={t('Logo 方案列表')}>
+                <div className="batch-history-section-meta">{t('历史批次')} {visibleBatches.findIndex((item) => item.request_id === historyBatch.request_id) + 1}</div>
+                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(historyOptions.length) } as CSSProperties}>
+                  {historyOptions.map((option, index) => {
+                    const retryKey = `${historyBatch.request_id}:${option.slot_index}`
+                    const retrying = retryingSlots.includes(retryKey)
+                    if (option.status === 'failed') return <article className="result-card result-card-failed" key={option.id}>
+                      <button className={retrying ? 'result-slot-retry loading' : 'result-slot-retry'} aria-label={`${t('重试失败方案')} ${option.slot_index + 1}`} title={t('重试此方案')} disabled={retrying || !option.retry_token || isBusy} onClick={() => option.retry_token && void retrySlot(historyBatch.request_id, option.slot_index, option.retry_token)}><RefreshCw aria-hidden="true" /></button>
+                      <span>{t('此方案生成失败，请重试。')}</span>
+                    </article>
+                    const selected = selectedOption?.id === option.id
+                    const saved = option.logoVersionId ? savedIds.has(option.logoVersionId) : false
+                    return <article className={`result-card ${selected ? 'selected' : ''}`} key={option.id}>
+                      <button className="result-select-control" aria-label={selected ? t('取消选择方案') : t('选择方案')} aria-pressed={selected} disabled={isBusy} onClick={() => {
+                        const nextSelection = selected ? null : option.id
+                        setSelectedId(nextSelection)
+                        rememberedResultSelection = nextSelection
+                          ? { batchId: historyBatch.request_id, logoVersionId: nextSelection }
+                          : null
+                      }} />
+                      <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
+                      {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading="eager" /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
+                    </article>
+                  })}
+                </div>
+              </section>)}
+              {isRegenerating && <section className="batch-history-section batch-history-generating" aria-label={t('正在生成新一批方案')}>
+                <div className="batch-history-section-meta">{t('正在生成新一批方案')}</div>
+                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(Math.max(batch.target_count, 1)) } as CSSProperties}>
+                  {Array.from({ length: Math.max(batch.target_count, 1) }, (_, index) => <article className="result-card result-card-generating" key={`generating-${index}`} aria-label={`${t('正在生成新一批方案')} ${index + 1}`}>
+                    <LoaderCircle aria-hidden="true" />
+                  </article>)}
+                </div>
+                <p className="batch-generating-hint">{t('预计需要 1～3 分钟，请稍等。')}</p>
+              </section>}
+            </div>
+            <BatchHistoryRail activeIndex={activeBatchIndex} total={visibleBatches.length} disabled={isBusy} onSelect={(index) => {
+              const target = visibleBatches[index]
+              const container = historyScrollRef.current
+              const section = target && container?.querySelector<HTMLElement>(`[data-batch-id="${target.request_id}"]`)
+              if (section && container) {
+                const top = section.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+                container.scrollTo({ top, behavior: 'smooth' })
+              }
+            }} previousLabel={t('上一批')} nextLabel={t('下一批')} label={t('生成批次工具')} />
           </div>}
         </section>
         <aside className="decision-panel result-workspace-panel" aria-live="polite">
           {!selectedOption ? <>
             <h2>{t('选择一个 Logo 方案')}</h2><p className="result-workspace-guide">{t('点击预览样机效果并选择提交您喜欢的风格')}</p><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
-            <button className="secondary result-regenerate-button" type="button" disabled={isBusy} onClick={requestReplaceBatch}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
-            <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
+            <button className="secondary result-regenerate-button" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={handleReplaceClick}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
+            <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isRegenerating) returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
           </> : <>
             <h2>{t('应用样机预览')}</h2>
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
@@ -423,8 +454,8 @@ export function GenerationResultsPage() {
                 <span>{batch.domain.split('.')[0].toUpperCase()}</span>
               </div>
             </div>
-            <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
-            <button className="result-replace-link" type="button" disabled={isBusy} onClick={() => void replaceBatch()}>{t('这批您都不喜欢？换一批')}</button>
+            <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy || isRegenerating} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy || isRegenerating} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
+            <button className="result-replace-link" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={() => { if (isRegenerating) { showToast(t('正在执行生图任务，请稍后。')); return } void replaceBatch(true) }}>{t('这批您都不喜欢？换一批')}</button>
           </>}
         </aside>
       </section>

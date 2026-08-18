@@ -70,7 +70,7 @@ class GenerationSlotRetryAcceptedDto(BaseModel):
 
 
 class GenerationBatchDto(BaseModel):
-    """One immutable successful batch in the fixed two-batch customer window."""
+    """One immutable successful batch in the customer's result history."""
 
     request_id: str
     domain: str
@@ -84,7 +84,7 @@ class GenerationBatchDto(BaseModel):
     candidates: list[GenerationCandidateSlotDto] = Field(default_factory=list)
 
 class GenerationStatusDto(BaseModel):
-    """The server-owned request status plus the two latest successful batches."""
+    """The server-owned request status plus all successful batches in the history."""
 
     request_id: str
     domain: str

@@ -11,7 +11,8 @@ export function resolveSuccessfulBatchWindow(
   currentActiveBatchId: string | null,
   committedRequestId: string | null = null,
 ): SuccessfulBatchWindow {
-  const successfulBatches = batches.filter((batch) => batch.status === 'succeeded').slice(-2)
+  // The API owns retention. Keep every successful batch returned for this customer.
+  const successfulBatches = batches.filter((batch) => batch.status === 'succeeded')
   const latestBatch = successfulBatches.at(-1) ?? null
   const committedBatch = committedRequestId
     ? successfulBatches.find((batch) => batch.request_id === committedRequestId)

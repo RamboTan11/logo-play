@@ -41,8 +41,23 @@ function customerFacingGenerationError(error: unknown, fallback: string): string
   return fallback
 }
 
+function generationSuccessToast(): string {
+  if (typeof window !== 'undefined' && window.localStorage.getItem('logo-generated.client-language') === 'en') {
+    return 'Generation succeeded'
+  }
+  return '生图成功'
+}
+
+function generationBusyToast(): string {
+  if (typeof window !== 'undefined' && window.localStorage.getItem('logo-generated.client-language') === 'en') {
+    return 'A generation task is already running. Please wait.'
+  }
+  return '正在执行生图任务，请稍后。'
+}
+
 interface ActiveGeneration {
   requestId: string
+  isRegenerating?: boolean
   domain?: string
   domainLabel?: string
   domainSuffix?: DomainSuffix
@@ -94,7 +109,10 @@ function readActiveGeneration(): ActiveGeneration | null {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(activeGenerationStorageKey) ?? 'null')
     if (typeof parsed !== 'object' || parsed === null || !('request_id' in parsed)) return null
     if (typeof parsed.request_id !== 'string' || !parsed.request_id) return null
-    if (!isMockMode) return { requestId: parsed.request_id }
+    if (!isMockMode) return {
+      requestId: parsed.request_id,
+      isRegenerating: 'is_regenerating' in parsed && parsed.is_regenerating === true,
+    }
     if (
       !('domain' in parsed)
       || !('domain_label' in parsed)
@@ -109,6 +127,7 @@ function readActiveGeneration(): ActiveGeneration | null {
     ) return null
     return {
       requestId: parsed.request_id,
+      isRegenerating: 'is_regenerating' in parsed && parsed.is_regenerating === true,
       domain: parsed.domain,
       domainLabel: parsed.domain_label,
       domainSuffix: parsed.domain_suffix,
@@ -124,11 +143,15 @@ function readActiveGeneration(): ActiveGeneration | null {
 function writeActiveGeneration(active: ActiveGeneration): void {
   if (typeof window === 'undefined') return
   if (!isMockMode) {
-    window.localStorage.setItem(activeGenerationStorageKey, JSON.stringify({ request_id: active.requestId }))
+    window.localStorage.setItem(activeGenerationStorageKey, JSON.stringify({
+      request_id: active.requestId,
+      is_regenerating: active.isRegenerating === true,
+    }))
     return
   }
   window.localStorage.setItem(activeGenerationStorageKey, JSON.stringify({
     request_id: active.requestId,
+    is_regenerating: active.isRegenerating === true,
     domain: active.domain,
     domain_label: active.domainLabel,
     domain_suffix: active.domainSuffix,
@@ -185,6 +208,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
 
       if (isRealStatus(response)) {
         const isProcessing = response.status === 'processing'
+        const isRegeneration = phase === 'regeneration'
+          || (phase === 'restore' && active.isRegenerating === true)
         const disposition = resolveGenerationPollDisposition(response.status, phase)
         if (disposition.clearActiveRequest) clearActiveGeneration()
         if (disposition.restoreLatestSuccessful) {
@@ -200,8 +225,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           domainLabel: response.domain_label,
           domainSuffix: response.domain_suffix,
           requestId: isProcessing ? response.request_id : null,
-          isProcessing: phase !== 'regeneration' && isProcessing,
-          isRegenerating: phase === 'regeneration' && isProcessing,
+          isProcessing,
+          isRegenerating: isRegeneration && isProcessing,
           completedGeneration: batchCompletion(batchWindow.latestBatch ?? undefined),
           batchHistory: batchWindow.batches,
           activeBatchId: batchWindow.activeBatchId,
@@ -209,9 +234,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           shouldRedirectToResults: disposition.shouldRedirectToResults,
           error: response.status === 'failed' ? '本批方案生成失败，请稍后重试。' : null,
         })
+        if (response.status === 'succeeded' && isRegeneration) {
+          useToastStore.getState().showToast(generationSuccessToast())
+        }
         if (isProcessing) {
           window.setTimeout(() => void poll(active, phase), 500)
-        } else if (response.status === 'failed' && phase === 'regeneration') {
+        } else if (response.status === 'failed' && isRegeneration) {
           set({ error: '重新生成失败，已保留原有方案。' })
           useToastStore.getState().showToast('重新生成失败，已保留原有方案。')
         }
@@ -254,7 +282,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         logo_versions: [],
         candidates: [],
       }
-      const prior = get().batchHistory.filter((item) => item.request_id !== batch.request_id).slice(-1)
+      const prior = get().batchHistory.filter((item) => item.request_id !== batch.request_id)
       const disposition = resolveGenerationPollDisposition(response.status, phase)
       set({
         domainLabel: phase === 'restore' ? '' : batch.domain_label,
@@ -269,6 +297,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         shouldRedirectToResults: disposition.shouldRedirectToResults,
         error: null,
       })
+      if (phase === 'regeneration') useToastStore.getState().showToast(generationSuccessToast())
       return 'restored'
     } catch (error) {
       if (get().requestId !== active.requestId) return 'stale'
@@ -335,6 +364,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     }
     const active: ActiveGeneration = {
       requestId: accepted.request_id,
+      isRegenerating: phase === 'regeneration',
       ...(isMockMode ? {
         domain: `${domainLabel}${domainSuffix}`,
         domainLabel,
@@ -346,7 +376,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     writeActiveGeneration(active)
     set({
       requestId: accepted.request_id,
-      isProcessing: phase === 'creation',
+      isProcessing: true,
       isRegenerating: phase === 'regeneration',
       completedGeneration: phase === 'creation' ? null : get().completedGeneration,
       activeBatchId: phase === 'creation' ? null : get().activeBatchId,
@@ -381,7 +411,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       set({ sourceImageAssetId: null, userReferenceRequirement: '', error: null })
     },
     generate: async () => {
-      if (get().isProcessing) return
+      if (get().isProcessing) {
+        useToastStore.getState().showToast(generationBusyToast())
+        return
+      }
       const domainLabel = get().domainLabel.trim()
       const domainSuffix = get().domainSuffix
       if (!domainLabel) {
@@ -401,7 +434,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     },
     regenerate: async () => {
       const current = get().completedGeneration
-      if (!current || get().isRegenerating || !regenerationGate.tryEnter()) return
+      if (get().isRegenerating) {
+        useToastStore.getState().showToast(generationBusyToast())
+        return
+      }
+      if (!current || !regenerationGate.tryEnter()) return
       set({ isRegenerating: true, error: null })
       try {
         await begin(current.domainLabel, current.domainSuffix, 'regeneration')
@@ -491,7 +528,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           readActive: readActiveGeneration,
           restoreActive: async (active) => {
             if (recoveryId !== recoverySequence) return 'stale'
-            set({ requestId: active.requestId, isProcessing: true, error: null })
+            set({
+              requestId: active.requestId,
+              isProcessing: true,
+              isRegenerating: active.isRegenerating === true,
+              error: null,
+            })
             return poll(active, 'restore')
           },
           onNoActive: () => {
