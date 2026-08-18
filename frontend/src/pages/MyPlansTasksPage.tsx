@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, WheelEvent as ReactWheelEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, WheelEvent as ReactWheelEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Smartphone } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { CachedImage } from '../components/CachedImage'
@@ -68,6 +69,44 @@ const adoptTooltip = '采用此方案后，我们会继续完善细节，并向�
 const completedDeliveryTooltip = '已有完成交付的方案，无法再次提交。若需变更方案，请联系运营人员处理。'
 const taskStatusLoadingTooltip = '正在加载当前任务状态。'
 
+function FloatingDisabledTooltip({ id, message, children }: { id: string; message: string; children: ReactNode }) {
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [position, setPosition] = useState<{ left: number; top: number; below: boolean } | null>(null)
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current
+    if (!anchor) return
+    const rect = anchor.getBoundingClientRect()
+    const tooltipWidth = Math.min(288, window.innerWidth - 24)
+    const left = Math.max(12, Math.min(rect.right + 8, window.innerWidth - tooltipWidth - 12))
+    const below = rect.top < 112
+    setPosition({ left, top: below ? rect.bottom + 8 : rect.top - 8, below })
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [updatePosition, visible])
+
+  const showTooltip = () => {
+    updatePosition()
+    setVisible(true)
+  }
+
+  const tooltip = visible && position && typeof document !== 'undefined'
+    ? createPortal(<span id={id} className="adopt-disabled-tooltip-floating" role="tooltip" style={{ left: position.left, top: position.top, transform: position.below ? 'none' : 'translateY(-100%)' }}>{message}</span>, document.body)
+    : null
+
+  return <div ref={anchorRef} className="adopt-tooltip adopt-disabled-tooltip" tabIndex={0} aria-describedby={id} onMouseEnter={showTooltip} onMouseLeave={() => setVisible(false)} onFocus={showTooltip} onBlur={() => setVisible(false)}>{children}{tooltip}</div>
+}
+
 function SavedLogoCard({ logo, onEdit, onAdopt, onMockupPreview, isAdoptionLocked, isAdoptionPending }: {
   logo: SavedLogoListItem
   onEdit: () => void
@@ -96,10 +135,9 @@ function SavedLogoCard({ logo, onEdit, onAdopt, onMockupPreview, isAdoptionLocke
       <div className="saved-logo-card-copy"><b>{t('已收藏方案')}</b><span>{logo.domain}</span></div>
       <div className="saved-logo-card-actions">
         <button className="secondary" type="button" aria-label={t('编辑') + ' ' + logo.domain + ' ' + t('收藏方案')} onClick={onEdit}>{t('编辑')}</button>
-        <div className={'adopt-tooltip' + (isAdoptionDisabled ? ' adopt-disabled-tooltip' : '')} tabIndex={isAdoptionDisabled ? 0 : undefined} aria-describedby={isAdoptionDisabled ? tooltipId : undefined}>
-          <button className="primary" type="button" aria-label={t('采用') + ' ' + logo.domain + ' ' + t('收藏方案')} aria-describedby={isAdoptionDisabled ? tooltipId : undefined} disabled={isAdoptionDisabled} onClick={onAdopt}>{t('采用')}</button>
-          <span id={tooltipId} role="tooltip">{t(tooltip)}</span>
-        </div>
+        {isAdoptionDisabled
+          ? <FloatingDisabledTooltip id={tooltipId} message={t(tooltip)}><button className="primary" type="button" aria-label={t('采用') + ' ' + logo.domain + ' ' + t('收藏方案')} aria-describedby={tooltipId} disabled onClick={onAdopt}>{t('采用')}</button></FloatingDisabledTooltip>
+          : <div className="adopt-tooltip"><button className="primary" type="button" aria-label={t('采用') + ' ' + logo.domain + ' ' + t('收藏方案')} disabled={isAdoptionDisabled} onClick={onAdopt}>{t('采用')}</button><span role="tooltip">{t(tooltip)}</span></div>}
       </div>
     </article>
   )
@@ -178,7 +216,6 @@ function TaskRow({
       <td className="my-task-domain"><b>{task.domain}</b></td>
       <td><TaskThumbnail src={task.adopted_image_url} alt={task.domain + ' ' + t('采用图片')} onPreview={onPreview} /></td>
       <td className="my-task-suggestion"><TextPreview value={task.adoption_suggestion} /></td>
-      <td className="my-task-feedback"><TextPreview value={task.customer_feedback} /></td>
       <td><time dateTime={task.submitted_at}>{formatBeijingDateTime(task.submitted_at)}</time></td>
       <td><span className={'task-status ' + task.status}>{t(taskStatusLabels[task.status])}</span></td>
       <td><TaskThumbnail src={task.delivery_image_url} alt={task.domain + ' ' + t('精修图片')} onPreview={onPreview} /></td>
@@ -237,8 +274,9 @@ function TaskDetailsModal({ task, onClose }: { task: MyTaskDetail; onClose: () =
 }
 
 function FeedbackDialog({ task, busy, onClose, onSubmit }: { task: MyTaskListItem; busy: boolean; onClose: () => void; onSubmit: (feedback: string) => void }) {
+  const { t } = useClientLanguage()
   const [feedback, setFeedback] = useState(task.customer_feedback ?? '')
-  return <div className="feedback-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><section className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><header><div><h2 id="feedback-title">交付反馈</h2><p>{task.domain} · 可随时修改</p></div><button type="button" aria-label="关闭" disabled={busy} onClick={onClose}>×</button></header><div className="feedback-dialog-body"><label><span>反馈意见</span><textarea maxLength={4000} value={feedback} disabled={busy} onChange={(event) => setFeedback(event.target.value)} placeholder="请输入您的反馈意见" /></label></div><footer><button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</button><button className="primary" type="button" disabled={busy || !feedback.trim()} onClick={() => onSubmit(feedback)}>{busy ? '提交中...' : '保存反馈'}</button></footer></section></div>
+  return <div className="feedback-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><section className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><header><div><h2 id="feedback-title">{t('交付反馈')}</h2><p>{task.domain} · {t('可随时修改')}</p></div><button type="button" aria-label={t('关闭')} disabled={busy} onClick={onClose}>×</button></header><div className="feedback-dialog-body"><label><span>{t('反馈意见')}</span><textarea maxLength={4000} value={feedback} disabled={busy} onChange={(event) => setFeedback(event.target.value)} placeholder={t('请输入您的反馈意见')} /></label></div><footer><button className="secondary" type="button" disabled={busy} onClick={onClose}>{t('取消')}</button><button className="primary" type="button" disabled={busy || !feedback.trim()} onClick={() => onSubmit(feedback)}>{busy ? t('提交中...') : t('保存反馈')}</button></footer></section></div>
 }
 
 function ImagePreviewModal({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -512,7 +550,7 @@ export function MyPlansTasksPage() {
         <section className="my-plans-section" aria-labelledby="saved-title"><header><div className="my-plans-section-heading"><h2 id="saved-title">{t('收藏方案')}</h2><p>{t('点击图片右上角角标可查看应用样机预览效果')}</p></div></header>{isSavedLogosLoading ? <SavedLogosLoading /> : savedLogosLoadError ? <section className="my-plans-load-error" role="alert"><p>{savedLogosLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : savedLogos.length ? <div className="saved-logo-grid" role="region" aria-label={t('收藏方案横向列表')} tabIndex={0} onKeyDown={scrollSavedLogos} onWheel={scrollSavedLogosWithWheel}>{savedLogos.map((logo) => <SavedLogoCard key={logo.id} logo={logo} isAdoptionLocked={isAdoptionLocked} isAdoptionPending={isTasksLoading || tasksLoadError !== null} onEdit={() => setEditingSavedLogo(logo)} onAdopt={() => { setIsChangingActiveTask(hasActiveTask); setAdoptingSavedLogo(logo) }} onMockupPreview={() => setPreviewMockup({ src: logo.image_url, domain: logo.domain })} />)}</div> : <p className="my-plans-empty">{t('暂无收藏方案')}</p>}</section>
           <section className="my-plans-section" aria-labelledby="tasks-title">
             <header><h2 id="tasks-title">{t('方案列表')}</h2></header>
-            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '反馈意见', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} onFeedback={setFeedbackTask} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
+            {isTasksLoading ? <TasksLoading /> : tasksLoadError ? <section className="my-plans-load-error" role="alert"><p>{tasksLoadError}</p><button className="secondary" type="button" onClick={() => void loadPage()}>{t('重试')}</button></section> : tasks.length ? <div className="my-plans-table-wrap"><table className="my-plans-table"><thead><tr>{['域名', '采用图片', '精修建议', '提交时间', '状态', '精修图片', '上传时间', '应用样机预览', '操作'].map((heading) => <th key={heading}>{t(heading)}</th>)}</tr></thead><tbody>{tasks.map((task) => <TaskRow key={task.id} task={task} isOpening={openingTaskId === task.id} isUpdating={isUpdatingSuggestion && taskBeingModified?.id === task.id} onViewDetails={(taskId) => void openTask(taskId)} onModifySuggestion={setTaskBeingModified} onPreview={(src, alt) => setPreviewImage({ src, alt })} onMockupPreview={(src, domain) => setPreviewMockup({ src, domain })} onFeedback={setFeedbackTask} />)}</tbody></table></div> : <p className="my-plans-empty">{t('暂无任务')}</p>}
           </section>
       </main>
       {detailLoadError && <section className="my-plans-detail-error" role="alert" aria-live="polite"><p>{detailLoadError.message}</p><button className="secondary" type="button" onClick={() => void openTask(detailLoadError.taskId)} disabled={openingTaskId === detailLoadError.taskId}>{t('重试')}</button></section>}

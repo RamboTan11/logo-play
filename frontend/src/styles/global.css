@@ -1077,6 +1077,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .saved-logo-card-actions .adopt-disabled-tooltip>span { top:calc(100% + 8px); right:auto; bottom:auto; left:calc(100% + 8px); width:min(288px,calc(100vw - 36px)); transform:translateY(-3px); }
 .saved-logo-card-actions .adopt-disabled-tooltip:hover>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-within>span, .saved-logo-card-actions .adopt-disabled-tooltip:focus-visible>span { transform:translateY(0); }
 .saved-logo-card-actions .adopt-disabled-tooltip:focus-visible>span { opacity:1; visibility:visible; transform:translateY(0); }
+.adopt-disabled-tooltip-floating { position:fixed; z-index:6000; width:min(288px,calc(100vw - 24px)); border:1px solid var(--gold); border-radius:4px; background:#2a0b12; color:var(--gold-bright); padding:8px 10px; box-shadow:0 14px 34px rgba(0,0,0,.48); font-size:12px; line-height:1.45; pointer-events:none; }
 
 /* Keep the delivered-state explanation above the action row so the horizontal plan rail cannot crop it. */
 .saved-logo-card-actions .adopt-disabled-tooltip>span { top:auto; right:0; bottom:calc(100% + 8px); left:auto; z-index:60; transform:translateY(3px); }
@@ -1258,8 +1259,8 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .my-task-mockup-selected-icon .cached-image { background:transparent; }
 .my-task-mockup-preview-dialog { position:relative; box-sizing:border-box; width:min(510px,100%); height:min(860px,calc(100vh - 48px)); display:grid; place-items:center; border:1px solid var(--line); border-radius:8px; background:#100609; box-shadow:0 28px 80px rgba(0,0,0,.58); }
 .my-task-mockup-large { width:min(430px,43vh,calc(100% - 48px)); max-height:none; }
-.my-task-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-.my-task-actions .secondary { min-height:34px; padding:7px 10px; font-size:11px; white-space:nowrap; }
+.my-task-actions { display:flex; min-width:max-content; align-items:center; gap:7px; flex-flow:row nowrap; white-space:nowrap; }
+.my-task-actions .secondary { min-height:34px; flex:0 0 auto; padding:7px 10px; font-size:11px; white-space:nowrap; }
 .my-task-image-preview { position:fixed; z-index:3300; inset:0; display:grid; place-items:center; padding:24px; background:rgba(5,2,3,.82); }
 .my-task-image-preview-dialog { position:relative; width:min(820px,100%); height:min(820px,calc(100vh - 48px)); display:grid; place-items:center; border:1px solid var(--line); border-radius:8px; background:#100609; box-shadow:0 28px 80px rgba(0,0,0,.58); }
 .my-task-image-preview-dialog img { display:block; width:100%; height:100%; padding:24px; object-fit:contain; }
@@ -1369,7 +1370,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .feedback-dialog>header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:20px; border-bottom:1px solid var(--line-red); }
 .feedback-dialog h2 { margin:0; font-size:19px; }.feedback-dialog header p { margin:6px 0 0; color:var(--muted); font-size:12px; }.feedback-dialog header button { width:30px; height:30px; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--gold-bright); font-size:20px; }
 .feedback-dialog-body { display:grid; gap:18px; padding:20px; }.feedback-dialog-body label { display:grid; gap:8px; }.feedback-dialog-body label>span,.feedback-label { color:var(--soft); font-size:12px; font-weight:700; }.feedback-dialog textarea { min-height:120px; resize:vertical; border:1px solid var(--line); border-radius:5px; background:#100609; color:var(--text); padding:11px; font:inherit; font-size:13px; line-height:1.55; }.feedback-dialog textarea:focus { border-color:var(--gold-bright); outline:0; box-shadow:0 0 0 2px rgba(247,198,90,.12); }.feedback-dialog-body .delivery-rating { margin-top:8px; }.feedback-dialog-body .delivery-rating button { width:34px; height:34px; font-size:27px; }.feedback-dialog>footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--line-red); }
-.my-plans-table { min-width:1420px; }.my-plans-table th:nth-child(3) { width:14%; }.my-plans-table th:nth-child(4) { width:14%; }.my-plans-table th:nth-child(5) { width:10%; }.my-plans-table th:nth-child(6) { width:8%; }.my-plans-table th:nth-child(10) { width:8%; }.my-task-feedback { white-space:pre-line; }
+.my-plans-table { min-width:1280px; }.my-plans-table th:nth-child(1) { width:11%; }.my-plans-table th:nth-child(2) { width:8%; }.my-plans-table th:nth-child(3) { width:15%; }.my-plans-table th:nth-child(4) { width:10%; }.my-plans-table th:nth-child(5) { width:8%; }.my-plans-table th:nth-child(6) { width:10%; }.my-plans-table th:nth-child(7) { width:10%; }.my-plans-table th:nth-child(8) { width:10%; }.my-plans-table th:nth-child(9) { width:18%; }
 .task-center-table { min-width:1260px; }.task-center-table th:nth-child(1) { width:14%; }.task-center-table th:nth-child(2) { width:15%; }.task-center-table th:nth-child(3) { width:14%; }.task-center-table th:nth-child(4) { width:10%; }.task-center-table th:nth-child(5) { width:15%; }.task-center-table th:nth-child(6) { width:15%; }.task-center-table th:nth-child(7) { width:7%; }.task-center-table th:nth-child(8) { width:20%; }
 
 /* T-043: rating is a separate, persistent client-side action after delivery. */
