@@ -120,6 +120,7 @@ export function GenerationResultsPage() {
   const selectedBatch = selectedOption
     ? visibleBatches.find((item) => item.request_id === selectedOption.overrideKey.split(':')[0]) ?? batch
     : null
+  const selectedDomain = selectedBatch?.domain ?? batch?.domain ?? ''
 
   useEffect(() => {
     rememberLastCreationPath('/results')
@@ -163,15 +164,14 @@ export function GenerationResultsPage() {
     container.scrollTop = container.scrollHeight
   }, [isRegenerating, visibleBatches.length])
 
-  const toggleSaved = async (logoVersionId: string) => {
+  const toggleSaved = async (logoVersionId: string, domain: string) => {
     if (pendingAction || isRegenerating) return
     // The production API creates a saved design but intentionally has no
     // delete endpoint. Do not present a local-only "unsave" state.
     if (savedIds.has(logoVersionId)) return
-    if (!batch) return
     setPendingAction('save')
     try {
-      await saveLogo(logoVersionId, batch.domain)
+      await saveLogo(logoVersionId, domain)
       setSavedIds((current) => new Set(current).add(logoVersionId))
       showToast(t('收藏成功，可前往'), { label: t('我的方案'), to: '/my-plans', suffix: t('查看') })
     } catch {
@@ -182,7 +182,7 @@ export function GenerationResultsPage() {
   }
 
   const adopt = async (suggestion = adoptionSuggestion, confirmReplaceActiveTask = false) => {
-    if (!selectedOptionId || !batch || pendingAction) return
+    if (!selectedOptionId || !selectedDomain || pendingAction) return
     setPendingAction('adopt')
     setAdoptionError(null)
     try {
@@ -190,7 +190,7 @@ export function GenerationResultsPage() {
         selectedOptionId,
         suggestion.trim() || null,
         import.meta.env.VITE_USE_MOCK === 'true'
-          ? { domain: batch.domain, initialLogoVersionId: selectedOptionId, aiEditInputs: [] }
+          ? { domain: selectedDomain, initialLogoVersionId: selectedOptionId, aiEditInputs: [] }
           : undefined,
         confirmReplaceActiveTask,
       )
@@ -356,7 +356,7 @@ export function GenerationResultsPage() {
                           ? { batchId: historyBatch.request_id, logoVersionId: nextSelection }
                           : null
                       }} />
-                      <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
+                      <button className={`result-save-icon ${saved ? 'saved' : ''}`} aria-label={saved ? t('已收藏') : t('收藏方案')} aria-pressed={saved} title={saved ? t('已收藏') : t('收藏方案')} disabled={isBusy || !option.logoVersionId || saved} onClick={(event) => { event.stopPropagation(); if (option.logoVersionId) void toggleSaved(option.logoVersionId, historyBatch.domain) }}><Star aria-hidden="true" fill={saved ? 'currentColor' : 'none'} /></button>
                       {option.imageUrl ? <CachedImage className="generated-logo-image" src={option.imageUrl} alt={t('生成的 Logo')} thumbnail loading={isNewestBatch ? 'eager' : 'lazy'} fetchPriority={isNewestBatch ? 'high' : 'low'} /> : <LogoArtwork variant={index + (historyBatch.request_id.length % 6)} domain={historyBatch.domain} />}
                     </article>
                   })}
@@ -383,8 +383,8 @@ export function GenerationResultsPage() {
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
               <img className="ios-phone-reference" src={iphoneMockupReferenceUrl} alt="" aria-hidden="true" loading="eager" decoding="async" />
               <div className="ios-phone-selected-app">
-                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail progressive loading="eager" /> : <LogoArtwork variant={selectedOption.slot_index} domain={batch.domain} compact />}</div>
-                <span>{batch.domain.split('.')[0].toUpperCase()}</span>
+                <div className="ios-phone-selected-icon">{selectedOption.imageUrl ? <CachedImage src={selectedOption.imageUrl} alt={t('生成的 Logo')} thumbnail progressive loading="eager" /> : <LogoArtwork variant={selectedOption.slot_index} domain={selectedDomain} compact />}</div>
+                <span>{selectedDomain.split('.')[0].toUpperCase()}</span>
               </div>
             </div>
             <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy || isRegenerating} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy || isRegenerating} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
@@ -392,9 +392,9 @@ export function GenerationResultsPage() {
           </>}
         </aside>
       </section>
-      {isEditOpen && selectedOption && selectedOptionId && <ResultEditDialog domain={batch.domain} source={{ id: selectedOptionId, imageUrl: selectedOption.imageUrl }} variant={selectedOption.slot_index} isPageBusy={isBusy} onClose={() => setIsEditOpen(false)} onGenerate={generateEdit} onUse={useEditedVersion} />}
+      {isEditOpen && selectedOption && selectedOptionId && <ResultEditDialog domain={selectedDomain} source={{ id: selectedOptionId, imageUrl: selectedOption.imageUrl }} variant={selectedOption.slot_index} isPageBusy={isBusy} onClose={() => setIsEditOpen(false)} onGenerate={generateEdit} onUse={useEditedVersion} />}
       {isReplaceConfirmOpen && <BatchReplaceConfirmDialog onClose={() => setIsReplaceConfirmOpen(false)} onConfirm={() => void replaceBatch()} />}
-      {adoptionDialogMode && selectedOptionId && <AdoptionConfirmDialog domain={batch.domain} initialSuggestion={adoptionSuggestion} isChange={adoptionDialogMode === 'replace'} isSubmitting={pendingAction === 'adopt'} errorMessage={adoptionError} onClose={() => { setAdoptionDialogMode(null); setAdoptionError(null) }} onConfirm={(suggestion) => void adopt(suggestion, adoptionDialogMode === 'replace')} />}
+      {adoptionDialogMode && selectedOptionId && <AdoptionConfirmDialog domain={selectedDomain} initialSuggestion={adoptionSuggestion} isChange={adoptionDialogMode === 'replace'} isSubmitting={pendingAction === 'adopt'} errorMessage={adoptionError} onClose={() => { setAdoptionDialogMode(null); setAdoptionError(null) }} onConfirm={(suggestion) => void adopt(suggestion, adoptionDialogMode === 'replace')} />}
     </main>
   </ClientShell>
 }
