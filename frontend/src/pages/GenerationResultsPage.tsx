@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronUp, RefreshCw, Star } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, RefreshCw, Star } from 'lucide-react'
 import { ClientShell } from '../components/ClientShell'
 import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { BatchReplaceConfirmDialog } from '../components/BatchReplaceConfirmDialog'
@@ -406,6 +406,7 @@ export function GenerationResultsPage() {
           {!selectedOption ? <>
             <h2>{t('选择一个 Logo 方案')}</h2><p className="result-workspace-guide">{t('点击预览样机效果并选择提交您喜欢的风格')}</p><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
             <button className="secondary result-regenerate-button" type="button" disabled={isBusy} onClick={requestReplaceBatch}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
+            <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
           </> : <>
             <h2>{t('应用样机预览')}</h2>
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>

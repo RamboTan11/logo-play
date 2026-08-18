@@ -73,6 +73,8 @@ const english: Record<string, string> = {
   '生成批次工具': 'Generation batch tools',
   '上一批': 'Previous batch',
   '下一批': 'Next batch',
+  '若您需修改创作的域名文字，可点击': 'To edit the creation domain text, click',
+  '返回创作页进行修改': 'to return to the creation page.',
   '换一批': 'Generate another batch',
   '本批方案未能完整生成': 'This batch could not be generated completely',
   '请稍后重新生成。': 'Please generate another batch later.',
