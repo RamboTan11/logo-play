@@ -90,7 +90,7 @@ export interface GenerationCandidateFailure {
 
 export interface GenerationCandidateSlot {
   slot_index: number
-  status: 'succeeded' | 'failed'
+  status: 'processing' | 'succeeded' | 'failed'
   logo_version_id: string | null
   image_url: string | null
   failure: GenerationCandidateFailure | null

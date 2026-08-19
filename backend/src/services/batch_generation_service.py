@@ -504,6 +504,10 @@ class BatchGenerationService:
             window_ids = {
                 request.id for request in await self._successful_batch_window(session, anchor)
             }
+            # A processing request can already own successful candidate assets.
+            # Keep those assets readable while the remaining provider tasks run.
+            if anchor.status == "processing":
+                window_ids.add(anchor.id)
             logo = await session.get(LogoVersion, logo_version_id)
             if (
                 logo is None
@@ -546,6 +550,8 @@ class BatchGenerationService:
         include_history: bool = True,
     ) -> GenerationStatusDto:
         rows = await self._successful_batch_window(session, request) if include_history else []
+        if request.status == "processing" and request.id not in {row.id for row in rows}:
+            rows.append(request)
         # Anchor each image URL to its own successful batch. Using the
         # currently polled request as the anchor rewrites every historical
         # URL after a regeneration and makes an already selected mockup
@@ -1252,6 +1258,11 @@ class BatchGenerationService:
                     GenerationCandidateJob.ordinal == slot_index + 1,
                 )
             )
+            if job is not None and job.status in {"pending", "running"}:
+                candidates.append(
+                    GenerationCandidateSlotDto(slot_index=slot_index, status="processing")
+                )
+                continue
             error_code = (job.error_code if job is not None else None) or "retry_in_progress"
             candidates.append(
                 GenerationCandidateSlotDto(

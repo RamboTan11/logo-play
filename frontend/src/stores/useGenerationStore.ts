@@ -12,7 +12,7 @@ import {
   getLatestSuccessfulGeneration,
   retryBatchGenerationSlot,
 } from '../services/generationsService'
-import { mergeRetriedBatchWindow, resolveSuccessfulBatchWindow } from '../utils/generationBatchWindow'
+import { mergeGenerationBatchWindow, mergeRetriedBatchWindow, resolveSuccessfulBatchWindow } from '../utils/generationBatchWindow'
 import {
   recoverInitialGeneration,
   resolveGenerationPollDisposition,
@@ -229,24 +229,6 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         const isProcessing = response.status === 'processing'
         const isRegeneration = phase === 'regeneration'
           || (phase === 'restore' && active.isRegenerating === true)
-        if (!includeHistory && isProcessing) {
-          // Keep the already-loaded batch history and current mockup selection
-          // stable while only the active request state is polled.
-          set({
-            domainLabel: response.domain_label,
-            domainSuffix: response.domain_suffix,
-            requestId: response.request_id,
-            isProcessing: true,
-            isRegenerating: isRegeneration,
-            activeTargetCount: response.target_count,
-            error: null,
-          })
-          window.setTimeout(
-            () => void poll(active, phase, sequence, false),
-            generationStatusPollIntervalMs,
-          )
-          return 'restored'
-        }
         const disposition = resolveGenerationPollDisposition(response.status, phase)
         if (disposition.clearActiveRequest) clearActiveGeneration()
         // A terminal restore response already contains the complete history.
@@ -257,8 +239,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           set({ requestId: null, isProcessing: false, isRegenerating: false })
           return 'stale'
         }
+        const mergedResponseBatches = includeHistory
+          ? response.batches
+          : mergeGenerationBatchWindow(get().batchHistory, response.batches)
         const batchWindow = resolveSuccessfulBatchWindow(
-          response.batches,
+          mergedResponseBatches,
           get().activeBatchId,
           response.status === 'succeeded' ? response.request_id : null,
         )
@@ -275,7 +260,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           isCompletedBatchesRestored: true,
           // An initial generation always lands in the results workspace, even
           // if its in-flight request was restored after navigating away.
-          shouldRedirectToResults: response.status === 'succeeded' && !isRegeneration,
+          shouldRedirectToResults: !isRegeneration && (
+            response.status === 'succeeded'
+            || (response.status === 'processing'
+              && response.batches.some((batch) => batch.candidates.some((candidate) => candidate.status === 'succeeded')))
+          ),
           error: response.status === 'failed' ? '本批方案生成失败，请稍后重试。' : null,
         })
         if (response.status === 'succeeded') {
@@ -522,8 +511,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           if (!isRealStatus(response)) {
             throw new Error('方案重试状态响应无效。')
           }
+          const mergedResponseBatches = mergeGenerationBatchWindow(get().batchHistory, response.batches)
           const batchWindow = resolveSuccessfulBatchWindow(
-            response.batches, get().activeBatchId, requestId,
+            mergedResponseBatches, get().activeBatchId, requestId,
           )
           const mergedBatches = mergeRetriedBatchWindow(
             get().batchHistory,
@@ -547,8 +537,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
             terminal = true
             break
           }
-          if (slot?.failure?.code === 'retry_in_progress' || !slot?.retry_token) {
+          if (slot?.status === 'processing') {
             sawRetryInProgress = true
+          } else if (slot?.failure?.code === 'retry_in_progress' || !slot?.retry_token) {
           } else {
             const failureSignature = `${slot.failure?.code ?? ''}:${slot.failure?.message ?? ''}`
             const hasFreshFailure = slot.retry_token !== retryToken

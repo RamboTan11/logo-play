@@ -48,7 +48,7 @@ class GenerationCandidateFailureDto(BaseModel):
 
 class GenerationCandidateSlotDto(BaseModel):
     slot_index: int
-    status: Literal["succeeded", "failed"]
+    status: Literal["processing", "succeeded", "failed"]
     logo_version_id: str | None = None
     image_url: str | None = None
     failure: GenerationCandidateFailureDto | None = None
