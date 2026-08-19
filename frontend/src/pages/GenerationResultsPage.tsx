@@ -85,6 +85,7 @@ export function GenerationResultsPage() {
   const navigate = useNavigate()
   const activeBatchId = useGenerationStore((state) => state.activeBatchId ?? null)
   const batchHistory = useGenerationStore((state) => Array.isArray(state.batchHistory) ? state.batchHistory : [])
+  const isProcessing = useGenerationStore((state) => state.isProcessing === true)
   const isRegenerating = useGenerationStore((state) => state.isRegenerating === true)
   const activeTargetCount = useGenerationStore((state) => state.activeTargetCount)
   const isCompletedBatchesRestored = useGenerationStore((state) => state.isCompletedBatchesRestored === true)
@@ -118,7 +119,7 @@ export function GenerationResultsPage() {
     .find((option) => option.id === selectedId && option.status === 'succeeded') ?? null
   const selectedOptionId = selectedOption?.logoVersionId ?? null
   const selectedBatch = selectedOption
-    ? visibleBatches.find((item) => item.request_id === selectedOption.overrideKey.split(':')[0]) ?? batch
+    ? optionsByBatch.find((entry) => entry.options.some((option) => option.id === selectedOption.id))?.batch ?? null
     : null
   const selectedDomain = selectedBatch?.domain ?? batch?.domain ?? ''
 
@@ -296,10 +297,10 @@ export function GenerationResultsPage() {
 
   const isFailed = batch.status === 'failed'
   const isBusy = pendingAction !== null
-  const replaceBusy = isRegenerating || pendingAction !== null
+  const replaceBusy = isProcessing || isRegenerating || pendingAction !== null
   const replaceDisabled = pendingAction !== null && !isRegenerating
   const handleReplaceClick = () => {
-    if (isRegenerating) {
+    if (isProcessing || isRegenerating) {
       showToast(t('正在执行生图任务，请稍后。'))
       return
     }
@@ -388,7 +389,7 @@ export function GenerationResultsPage() {
               </div>
             </div>
             <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy || isRegenerating} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy || isRegenerating} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
-            <button className="result-replace-link" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={() => { if (isRegenerating) { showToast(t('正在执行生图任务，请稍后。')); return } void replaceBatch(true) }}>{t('这批您都不喜欢？换一批')}</button>
+            <button className="result-replace-link" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={() => { if (isProcessing || isRegenerating) { showToast(t('正在执行生图任务，请稍后。')); return } void replaceBatch(true) }}>{t('这批您都不喜欢？换一批')}</button>
           </>}
         </aside>
       </section>

@@ -431,7 +431,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       set({ sourceImageAssetId: null, userReferenceRequirement: '', error: null })
     },
     generate: async () => {
-      if (get().isProcessing) {
+      if (get().isProcessing || get().isRegenerating) {
         useToastStore.getState().showToast(generationBusyToast())
         return
       }
@@ -454,7 +454,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     },
     regenerate: async () => {
       const current = get().completedGeneration
-      if (get().isRegenerating) {
+      if (get().isProcessing || get().isRegenerating) {
         useToastStore.getState().showToast(generationBusyToast())
         return
       }
