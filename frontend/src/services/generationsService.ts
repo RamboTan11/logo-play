@@ -43,7 +43,7 @@ export function buildBatchGenerationPayload(
     domain_label: domainLabel,
     domain_suffix: domainSuffix,
     ...(sourceImageAssetId ? { source_image_asset_id: sourceImageAssetId } : {}),
-    ...(sourceImageAssetId && userReferenceRequirement
+    ...(userReferenceRequirement?.trim()
       ? { user_reference_requirement: userReferenceRequirement }
       : {}),
   }

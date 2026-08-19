@@ -117,6 +117,8 @@ const english: Record<string, string> = {
   '正在探索新的设计方向，生成结果会自动显示': 'Exploring new design directions. Results will appear automatically.',
   '生图成功': 'Generation succeeded',
   '生图完成': 'Generation complete',
+  '创作要求（选填）': 'Creation request (optional)',
+  '请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。': 'Enter a creation request, for example: use only the letters mmg in the design (optional).',
   '选择初稿': 'Select a concept',
   '采用后由我们继续优化为最终成品': 'After adoption, we will continue refining it into the final deliverable.',
   '优化需求（选填）': 'Optimization request (optional)',

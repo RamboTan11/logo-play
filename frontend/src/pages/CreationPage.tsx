@@ -276,7 +276,7 @@ export function CreationPage() {
                 {!isUploadingSource && sourceImageAssetId && <button className="creation-source-preview-remove" type="button" title={t('删除视觉参考')} aria-label={t('删除视觉参考')} onClick={removeSourceImage}><X size={14} aria-hidden="true" /></button>}
               </div>
               <div className="creation-source-side">
-                <label className="creation-reference-requirement"><span className="sr-only">{t('参考要求（选填）')}</span><textarea aria-label={t('参考要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入图片参考要求，默认保留其中辨识度的主体图形、结构关系、独特视觉特征（可留空）。')} readOnly={isRegenerating} onClick={() => { if (isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
+                <label className="creation-reference-requirement"><span className="sr-only">{t('创作要求（选填）')}</span><textarea aria-label={t('创作要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。')} readOnly={isRegenerating} onClick={() => { if (isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
               </div>
             </div>
           </div>

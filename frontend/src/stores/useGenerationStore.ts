@@ -364,7 +364,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         domainLabel,
         domainSuffix,
         sourceImageAssetId,
-        sourceImageAssetId ? userReferenceRequirement : null,
+        userReferenceRequirement || null,
       )
     } catch (error) {
       if (
@@ -428,7 +428,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     setUserReferenceRequirement: (userReferenceRequirement) => set({ userReferenceRequirement, error: null }),
     clearSourceImage: () => {
       clearGenerationSourceRecovery()
-      set({ sourceImageAssetId: null, userReferenceRequirement: '', error: null })
+      set({ sourceImageAssetId: null, error: null })
     },
     generate: async () => {
       if (get().isProcessing || get().isRegenerating) {

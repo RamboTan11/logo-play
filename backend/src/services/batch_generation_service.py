@@ -136,12 +136,6 @@ class BatchGenerationService:
         if normalized_label is None:
             raise BatchGenerationRequestError("invalid_domain", "请输入品牌信息", 422)
         raw_requirement = user_reference_requirement.strip() if user_reference_requirement else None
-        if source_image_asset_id is None and raw_requirement:
-            raise BatchGenerationRequestError(
-                "source_image_required_for_reference_requirement",
-                "上传视觉参考后才能填写参考要求",
-                422,
-            )
         source_asset: AssetRecord | None = None
         if source_image_asset_id is not None:
             source_asset = await session.get(AssetRecord, source_image_asset_id)
