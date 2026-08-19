@@ -116,6 +116,7 @@ const english: Record<string, string> = {
   '正在生成新一批方案': 'Generating another batch',
   '正在探索新的设计方向，生成结果会自动显示': 'Exploring new design directions. Results will appear automatically.',
   '生图成功': 'Generation succeeded',
+  '生图完成': 'Generation complete',
   '选择初稿': 'Select a concept',
   '采用后由我们继续优化为最终成品': 'After adoption, we will continue refining it into the final deliverable.',
   '优化需求（选填）': 'Optimization request (optional)',

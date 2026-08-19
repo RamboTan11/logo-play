@@ -41,11 +41,11 @@ function customerFacingGenerationError(error: unknown, fallback: string): string
   return fallback
 }
 
-function generationSuccessToast(): string {
+function generationCompleteToast(): string {
   if (typeof window !== 'undefined' && window.localStorage.getItem('logo-generated.client-language') === 'en') {
-    return 'Generation succeeded'
+    return 'Generation complete'
   }
-  return '生图成功'
+  return '生图完成'
 }
 
 function generationBusyToast(): string {
@@ -247,8 +247,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           shouldRedirectToResults: disposition.shouldRedirectToResults,
           error: response.status === 'failed' ? '本批方案生成失败，请稍后重试。' : null,
         })
-        if (response.status === 'succeeded' && isRegeneration) {
-          useToastStore.getState().showToast(generationSuccessToast())
+        if (response.status === 'succeeded') {
+          useToastStore.getState().showToast(generationCompleteToast())
         }
         if (isProcessing) {
           window.setTimeout(() => void poll(active, phase, sequence), 500)
@@ -312,7 +312,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         shouldRedirectToResults: disposition.shouldRedirectToResults,
         error: null,
       })
-      if (phase === 'regeneration') useToastStore.getState().showToast(generationSuccessToast())
+      if (response.status === 'succeeded') useToastStore.getState().showToast(generationCompleteToast())
       return 'restored'
     } catch (error) {
       if (sequence !== pollSequence || get().requestId !== active.requestId) return 'stale'
@@ -414,7 +414,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     error: null,
     requestId: initialActiveGeneration?.requestId ?? null,
     isProcessing: initialActiveGeneration !== null,
-    isRegenerating: false,
+    isRegenerating: initialActiveGeneration?.isRegenerating === true,
     activeTargetCount: initialActiveGeneration?.targetCount ?? null,
     completedGeneration: null,
     batchHistory: [],
@@ -620,6 +620,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       await get().restoreActiveGeneration()
     },
     returnToCreation: () => {
+      if (get().isProcessing || get().requestId) return
       recoverySequence += 1
       pollSequence += 1
       clearActiveGeneration()

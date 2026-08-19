@@ -208,7 +208,7 @@ export function CreationPage() {
         >
           <ArrowRight size={19} strokeWidth={2.2} aria-hidden="true" />
         </button>}
-        {isProcessing && !isRegenerating ? <section className="minimal-domain-stage creation-generating-stage" aria-busy="true">
+        {isProcessing ? <section className="minimal-domain-stage creation-generating-stage" aria-busy="true">
           <GenerationWaitingState title={t('正在生成 Logo 方案')} description={t('正在根据您的域名探索设计方向，生成结果会自动显示')} />
         </section> : <section className="minimal-domain-stage" aria-live="polite">
           <label className="sr-only" htmlFor="brand-domain-entry">{t('品牌域名')}</label>

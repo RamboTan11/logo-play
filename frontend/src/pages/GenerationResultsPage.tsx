@@ -317,7 +317,7 @@ export function GenerationResultsPage() {
       <section className="generation-workspace">
         <section className="generation-results-panel" aria-live="polite">
           <header className="batch-toolbar">
-            <button className="toolbar-icon icon-tooltip toolbar-return" data-tooltip={t('返回创作')} aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isRegenerating) returnToCreation(); navigate('/create') }}>←</button>
+            <button className="toolbar-icon icon-tooltip toolbar-return" data-tooltip={t('返回创作')} aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isProcessing && !isRegenerating) returnToCreation(); navigate('/create') }}>←</button>
           </header>
           {isFailed && !isRegenerating ? <div className="generation-loading-panel"><b>{t('本批方案未能完整生成')}</b><span>{t('请稍后重新生成。')}</span></div> : <div className="generation-results-stage" aria-busy={isRegenerating}>
             <div
@@ -378,7 +378,7 @@ export function GenerationResultsPage() {
           {!selectedOption ? <>
             <h2 className="result-workspace-title">{t('点击预览样机效果并选择提交您喜欢的风格')}</h2><p className="result-workspace-guide">{t('若没有您喜欢的，可以点击下方按钮换一批')}</p>
             <button className="secondary result-regenerate-button" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={handleReplaceClick}><RefreshCw aria-hidden="true" />{t('换一批')}</button>
-            <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isRegenerating) returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
+            <p className="result-domain-hint">{t('若您需修改创作的域名文字，可点击')}<button className="result-domain-back" type="button" aria-label={t('返回创作')} title={t('返回创作')} onClick={() => { if (!isProcessing && !isRegenerating) returnToCreation(); navigate('/create') }}><ArrowLeft size={16} aria-hidden="true" /></button>{t('返回创作页进行修改')}</p>
           </> : <>
             <h2>{t('应用样机预览')}</h2>
             <div className="ios-phone-mockup" aria-label={t('应用样机预览')}>
