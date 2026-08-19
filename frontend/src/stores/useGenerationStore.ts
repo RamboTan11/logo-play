@@ -244,7 +244,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           batchHistory: batchWindow.batches,
           activeBatchId: batchWindow.activeBatchId,
           isCompletedBatchesRestored: true,
-          shouldRedirectToResults: disposition.shouldRedirectToResults,
+          // An initial generation always lands in the results workspace, even
+          // if its in-flight request was restored after navigating away.
+          shouldRedirectToResults: response.status === 'succeeded' && !isRegeneration,
           error: response.status === 'failed' ? '本批方案生成失败，请稍后重试。' : null,
         })
         if (response.status === 'succeeded') {
@@ -309,7 +311,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         batchHistory: [...prior, batch],
         activeBatchId: batch.request_id,
         isCompletedBatchesRestored: true,
-        shouldRedirectToResults: disposition.shouldRedirectToResults,
+        shouldRedirectToResults: response.status === 'succeeded'
+          && !(phase === 'restore' && active.isRegenerating === true),
         error: null,
       })
       if (response.status === 'succeeded') useToastStore.getState().showToast(generationCompleteToast())

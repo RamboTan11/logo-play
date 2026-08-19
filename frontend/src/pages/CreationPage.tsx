@@ -117,8 +117,8 @@ export function CreationPage() {
   }, [sourceFilename, sourceImageAssetId, userReferenceRequirement])
 
   useEffect(() => {
-    if (completedGeneration && shouldRedirectToResults) navigate('/results')
-  }, [completedGeneration, navigate, shouldRedirectToResults])
+    if (shouldRedirectToResults) navigate('/results')
+  }, [navigate, shouldRedirectToResults])
 
   useEffect(() => {
     if (!isSuffixOpen) return
