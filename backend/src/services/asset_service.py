@@ -1,5 +1,6 @@
 """Immutable local-fallback asset storage for internal server use."""
 
+import asyncio
 import warnings
 from dataclasses import dataclass
 from hashlib import sha256
@@ -240,9 +241,13 @@ class AssetService:
         if media_type not in {"image/png", "image/jpeg"}:
             raise ValueError("Generated Logo must be PNG or JPEG")
         stored = self._storage.write(content, media_type)
-        # A thumbnail is an optimization only. A malformed provider response
-        # must not turn a successful original-image write into a failed job.
-        self._storage.write_thumbnail(stored.storage_key, content)
+        # Thumbnail encoding is CPU-bound and is not part of committing a
+        # supplier result. Keep it off the API event loop and let the image
+        # endpoint build a preview on demand if this warm-up has not finished.
+        asyncio.create_task(
+            asyncio.to_thread(self._storage.write_thumbnail, stored.storage_key, content),
+            name=f"generated-logo-thumbnail-{stored.asset_id}",
+        )
         record = AssetRecord(
             asset_id=stored.asset_id,
             purpose=GENERATED_LOGO_PURPOSE,
@@ -274,7 +279,11 @@ class AssetService:
             raise LookupError("Generated Logo not found")
         try:
             content = self._storage.read(record.storage_key)
-            return record, self._storage.read_thumbnail(record.storage_key, content) if thumbnail else content
+            if thumbnail:
+                content = await asyncio.to_thread(
+                    self._storage.read_thumbnail, record.storage_key, content
+                )
+            return record, content
         except OSError as error:
             raise LookupError("Generated Logo not found") from error
 
