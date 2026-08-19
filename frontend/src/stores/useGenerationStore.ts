@@ -25,6 +25,7 @@ const activeGenerationStorageKey = 'logo-generated.active-generation'
 const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
 const slotRetryPollIntervalMs = 300
 const slotRetryMaxPolls = 400
+const generationStatusPollIntervalMs = 1500
 
 const generationConfigurationErrorCodes = new Set([
   'batch_policy_not_published',
@@ -208,16 +209,44 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     active: ActiveGeneration,
     phase: 'creation' | 'regeneration' | 'restore',
     sequence: number,
+    includeHistory = true,
   ): Promise<'restored' | 'stale'> => {
     try {
       if (sequence !== pollSequence) return 'stale'
-      const response = await getBatchGenerationStatus(active.requestId, active.submittedAt ?? null)
+      const response = await getBatchGenerationStatus(
+        active.requestId,
+        active.submittedAt ?? null,
+        includeHistory,
+      )
       if (sequence !== pollSequence || get().requestId !== active.requestId) return 'stale'
 
       if (isRealStatus(response)) {
+        // A lightweight terminal response intentionally omits history. Fetch it
+        // once before updating the completed workspace and image URLs.
+        if (!includeHistory && response.status !== 'processing') {
+          return poll(active, phase, sequence, true)
+        }
         const isProcessing = response.status === 'processing'
         const isRegeneration = phase === 'regeneration'
           || (phase === 'restore' && active.isRegenerating === true)
+        if (!includeHistory && isProcessing) {
+          // Keep the already-loaded batch history and current mockup selection
+          // stable while only the active request state is polled.
+          set({
+            domainLabel: response.domain_label,
+            domainSuffix: response.domain_suffix,
+            requestId: response.request_id,
+            isProcessing: true,
+            isRegenerating: isRegeneration,
+            activeTargetCount: response.target_count,
+            error: null,
+          })
+          window.setTimeout(
+            () => void poll(active, phase, sequence, false),
+            generationStatusPollIntervalMs,
+          )
+          return 'restored'
+        }
         const disposition = resolveGenerationPollDisposition(response.status, phase)
         if (disposition.clearActiveRequest) clearActiveGeneration()
         // A terminal restore response already contains the complete history.
@@ -253,7 +282,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           useToastStore.getState().showToast(generationCompleteToast())
         }
         if (isProcessing) {
-          window.setTimeout(() => void poll(active, phase, sequence), 500)
+          window.setTimeout(
+            () => void poll(active, phase, sequence, false),
+            generationStatusPollIntervalMs,
+          )
         } else if (response.status === 'failed' && isRegeneration) {
           set({ error: '重新生成失败，已保留原有方案。' })
           useToastStore.getState().showToast('重新生成失败，已保留原有方案。')

@@ -319,11 +319,14 @@ async def get_generation_status(
     request_id: str,
     principal: CustomerDependency,
     service: ServiceDependency,
+    include_history: bool = Query(True),
 ) -> APIResponse | JSONResponse:
-    """Return request status and the complete successful result history."""
+    """Return request status and, when requested, complete successful history."""
 
     try:
-        result = await service.status_for_customer(principal.id, request_id)
+        result = await service.status_for_customer(
+            principal.id, request_id, include_history=include_history
+        )
     except BatchGenerationRequestError as error:
         return _request_error_response(error)
     return success_response(data=result.model_dump(mode="json"))

@@ -213,13 +213,17 @@ export async function getSingleEditContext(logoVersionId: string): Promise<Singl
 export async function getBatchGenerationStatus(
   requestId: string,
   submittedAt: number | null,
+  includeHistory = true,
 ): Promise<BatchGenerationStatusData | GenerationStatusData> {
   if (isMockMode) {
     const response = await getBatchGenerationStatusMock(requestId, submittedAt ?? Date.now())
     return response.data
   }
   try {
-    return (await api.get<ApiResponse<BatchGenerationStatusData>>(`/v1/generations/${encodeURIComponent(requestId)}`)).data.data
+    return (await api.get<ApiResponse<BatchGenerationStatusData>>(
+      `/v1/generations/${encodeURIComponent(requestId)}`,
+      { params: includeHistory ? undefined : { include_history: false } },
+    )).data.data
   } catch (error) {
     throw new GenerationApiError(errorCode(error) ?? 'generation_status_failed', '生成状态查询失败，请稍后重试。')
   }

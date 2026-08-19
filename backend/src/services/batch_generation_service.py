@@ -454,8 +454,10 @@ class BatchGenerationService:
                 },
             )
 
-    async def status_for_customer(self, customer_id: str, request_id: str) -> GenerationStatusDto:
-        """Return request status plus the customer's complete successful history."""
+    async def status_for_customer(
+        self, customer_id: str, request_id: str, *, include_history: bool = True
+    ) -> GenerationStatusDto:
+        """Return request status, with history only when the caller needs it."""
 
         async with get_db_context(self._runtime) as session:
             request = await session.get(GenerationRequest, request_id)
@@ -469,7 +471,7 @@ class BatchGenerationService:
             request = await session.get(GenerationRequest, request_id)
             if request is None:
                 raise BatchGenerationRequestError("generation_not_found", "生成请求不存在", 404)
-            return await self._status_dto(session, request)
+            return await self._status_dto(session, request, include_history=include_history)
 
     async def latest_successful_for_customer(
         self, customer_id: str
@@ -537,9 +539,13 @@ class BatchGenerationService:
         return rows
 
     async def _status_dto(
-        self, session: AsyncSession, request: GenerationRequest
+        self,
+        session: AsyncSession,
+        request: GenerationRequest,
+        *,
+        include_history: bool = True,
     ) -> GenerationStatusDto:
-        rows = await self._successful_batch_window(session, request)
+        rows = await self._successful_batch_window(session, request) if include_history else []
         # Anchor each image URL to its own successful batch. Using the
         # currently polled request as the anchor rewrites every historical
         # URL after a regeneration and makes an already selected mockup
