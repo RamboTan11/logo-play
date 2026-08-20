@@ -115,11 +115,6 @@ class SingleImageEditService:
             if source is None or source.customer_id != customer_id:
                 raise SingleImageEditRequestError("logo_version_not_found", "当前版本不存在", 404)
             root_id = source.root_logo_version_id or source.id
-            latest = await self._latest_version(session, customer_id, root_id)
-            if latest is None or latest.id != source.id:
-                raise SingleImageEditRequestError(
-                    "stale_source_version", "请基于当前最新版本继续编辑", 409
-                )
             active_request = await session.scalar(
                 select(SingleImageEditRequest.id)
                 .where(
@@ -544,8 +539,8 @@ class SingleImageEditService:
             latest = await self._latest_version(
                 session, request.customer_id, request.root_logo_version_id
             )
-            if latest is None or latest.id != source.id:
-                raise LookupError("Single-image edit source is no longer current")
+            if latest is None:
+                raise LookupError("Single-image edit version chain is unavailable")
             asset = await self._assets.create_generated_logo(
                 session,
                 content=content,
@@ -566,7 +561,7 @@ class SingleImageEditService:
                     single_edit_request_id=request.id,
                     parent_logo_version_id=source.id,
                     root_logo_version_id=request.root_logo_version_id,
-                    version_number=source.version_number + 1,
+                    version_number=latest.version_number + 1,
                     asset_id=asset.asset_id,
                     created_at=datetime.now(UTC),
                 )

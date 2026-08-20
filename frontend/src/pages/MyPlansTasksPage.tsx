@@ -8,7 +8,7 @@ import { AdoptionConfirmDialog } from '../components/AdoptionConfirmDialog'
 import { ResultEditDialog } from '../components/ResultEditDialog'
 import type { ResultEditVersion } from '../components/ResultEditDialog'
 import { adoptLogo, getMyTask, getMyTasks, submitTaskFeedback } from '../services/designTasksService'
-import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
+import { createSingleEditGeneration, getSingleEditStatus } from '../services/generationsService'
 import { getSavedLogos, updateSavedLogo } from '../services/savedLogosService'
 import { useToastStore } from '../stores/useToastStore'
 import type { MyTaskDetail, MyTaskListItem, SavedLogoListItem } from '../types/api'
@@ -522,21 +522,8 @@ export function MyPlansTasksPage() {
     if (!editingSavedLogo || isEditingSavedLogo) return null
     setIsEditingSavedLogo(true)
     try {
-      let sourceVersionId = editingSavedLogo.logo_version_id
-      if (!isMockMode) {
-        const context = await getSingleEditContext(sourceVersionId)
-        sourceVersionId = context.current_version_id
-        if (sourceVersionId !== editingSavedLogo.logo_version_id) {
-          const current = context.versions.find((version) => version.id === sourceVersionId)
-          if (current) {
-            setEditingSavedLogo((existing) => existing && existing.id === editingSavedLogo.id
-              ? { ...existing, logo_version_id: current.id, image_url: current.image_url }
-              : existing)
-          }
-        }
-      }
       const accepted = await createSingleEditGeneration(
-        sourceVersionId,
+        editingSavedLogo.logo_version_id,
         instruction.trim() || defaultEditInstruction,
       )
       if (isMockMode) return { id: accepted.request_id, imageUrl: null }

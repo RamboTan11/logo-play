@@ -15,7 +15,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .language-switcher button { min-width:31px; height:24px; border:0; border-radius:3px; background:transparent; color:rgba(255,227,138,.7); padding:0 6px; font-family:Inter,Arial,sans-serif; font-size:10px; font-weight:800; letter-spacing:0; transition:background .16s ease,color .16s ease,box-shadow .16s ease; }
 .language-switcher button:hover { color:var(--gold-bright); }.language-switcher button.active { background:rgba(247,198,90,.18); color:#fff9e9; box-shadow:0 1px 5px rgba(0,0,0,.22); }.language-switcher button:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
 .client-main { max-width:1240px; margin:0 auto; padding:28px 36px 48px; }
-.creation-main.minimal-domain-main { display:grid; grid-template-columns:minmax(0,1fr); place-items:center; min-height:calc(100vh - 72px); padding:40px 24px; background:#19070c; }
+.creation-main.minimal-domain-main { width:100%; max-width:none; margin:0; display:grid; grid-template-columns:minmax(0,1fr); place-items:center; min-height:calc(100vh - 72px); padding:40px 24px; background:#19070c; }
 .minimal-domain-main .minimal-domain-stage { width:min(680px,100%); min-width:0; text-align:center; }
 .minimal-domain-main .minimal-domain-field { position:relative; display:flex; align-items:center; width:100%; border:1px solid rgba(247,198,90,.68); border-radius:4px; background:rgba(15,4,7,.78); box-shadow:0 0 0 1px rgba(120,24,43,.36),0 24px 70px rgba(0,0,0,.3); transition:border-color .18s ease,box-shadow .18s ease; }
 .minimal-domain-main .minimal-domain-field:focus-within { border-color:var(--gold-bright); box-shadow:0 0 0 3px rgba(247,198,90,.14),0 24px 70px rgba(0,0,0,.36); }
@@ -1449,18 +1449,21 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .result-replace-link { width:100%; border:0; background:transparent; color:var(--gold-bright); padding:8px 0; font-size:12px; text-decoration:underline; text-underline-offset:3px; }
 .result-replace-link:hover:not(:disabled),.result-replace-link:focus-visible { color:#fff1b2; outline:0; }
 .result-edit-modal,.batch-replace-modal { position:fixed; z-index:4200; inset:0; display:grid; place-items:center; padding:20px; background:rgba(7,2,4,.72); }
-.result-edit-dialog { width:min(690px,100%); max-height:calc(100vh - 40px); display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--elevated); box-shadow:0 28px 80px rgba(0,0,0,.56); }
-.result-edit-dialog>header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:18px 20px; border-bottom:1px solid var(--line-red); }
+.result-edit-dialog { width:min(560px,100%); max-height:calc(100vh - 64px); display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--elevated); box-shadow:0 28px 80px rgba(0,0,0,.56); }
+.result-edit-dialog>header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:14px 16px; border-bottom:1px solid var(--line-red); }
 .result-edit-dialog h2,.result-edit-dialog h3 { margin:0; }
 .result-edit-dialog h2 { font-size:18px; }.result-edit-dialog h3 { margin-bottom:9px; font-size:13px; }
 .result-edit-dialog header p { margin:5px 0 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
-.result-edit-dialog header>button { display:grid; width:32px; height:32px; place-items:center; flex:none; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--gold-bright); padding:0; font-size:20px; line-height:1; }
-.result-edit-body { position:relative; display:grid; gap:16px; overflow:auto; padding:20px; }
+.result-edit-dialog header>button { display:grid; width:28px; height:28px; place-items:center; flex:none; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--gold-bright); padding:0; font-size:18px; line-height:1; }
+.result-edit-body { position:relative; display:grid; gap:12px; overflow:auto; padding:16px; }
 .result-edit-artwork { display:grid; width:fit-content; max-width:100%; min-height:0; place-items:center; overflow:hidden; border:1px solid var(--line-red); border-radius:6px; background:#140609; margin:0 auto; }
-.result-edit-artwork img { display:block; width:auto; height:auto; max-width:100%; max-height:300px; object-fit:contain; }
-.result-edit-artwork .logo-artwork { width:fit-content; min-width:150px; min-height:0; padding:14px; }.result-edit-artwork .logo-artwork svg { width:96px; height:96px; }
-.result-edit-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }.result-edit-comparison>div { min-width:0; }
-.result-edit-instruction textarea { min-height:130px; height:130px; }
+.result-edit-artwork { width:100%; aspect-ratio:1.35; }
+.result-edit-artwork img { display:block; width:100%; height:100%; max-width:100%; max-height:none; object-fit:contain; }
+.result-edit-artwork .logo-artwork { width:100%; height:100%; min-width:0; min-height:0; padding:10px; }.result-edit-artwork .logo-artwork svg { width:76px; height:76px; }
+.result-edit-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.result-edit-comparison.source-only { grid-template-columns:minmax(0,1fr); max-width:280px; width:100%; margin:0 auto; }.result-edit-comparison>div { min-width:0; }.result-edit-comparison h3 { margin-bottom:6px; font-size:12px; }
+.result-edit-artwork-loading { display:grid; place-items:center; background:#18080d; }
+.result-edit-artwork-loading .result-card-generation-track { width:42%; }
+.result-edit-instruction textarea { min-height:88px; height:88px; }
 .result-edit-error { margin:0; border:1px solid rgba(255,112,112,.5); border-radius:4px; background:rgba(82,16,24,.58); color:#ffd7d7; padding:9px 10px; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 .result-edit-generating-overlay { position:absolute; z-index:3; inset:0; display:grid; place-items:center; padding:24px; background:rgba(7,2,4,.78); }
 .result-edit-generating-overlay .generation-waiting-state { width:min(430px,100%); }

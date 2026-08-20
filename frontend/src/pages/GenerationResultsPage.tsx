@@ -10,7 +10,7 @@ import type { ResultEditVersion } from '../components/ResultEditDialog'
 import { CachedImage, preloadCachedImage, preloadImage } from '../components/CachedImage'
 import { LogoArtwork } from '../components/LogoArtwork'
 import { adoptLogo } from '../services/designTasksService'
-import { createSingleEditGeneration, getSingleEditContext, getSingleEditStatus } from '../services/generationsService'
+import { createSingleEditGeneration, getSingleEditStatus } from '../services/generationsService'
 import { getSavedLogos, saveLogo } from '../services/savedLogosService'
 import { useGenerationStore } from '../stores/useGenerationStore'
 import { useToastStore } from '../stores/useToastStore'
@@ -226,24 +226,8 @@ export function GenerationResultsPage() {
     if (!selectedOptionId) return null
     setPendingAction('edit')
     try {
-      let sourceVersionId = selectedOptionId
-      if (import.meta.env.VITE_USE_MOCK !== 'true') {
-        const context = await getSingleEditContext(selectedOptionId)
-        sourceVersionId = context.current_version_id
-        if (sourceVersionId !== selectedOptionId) {
-          const current = context.versions.find((version) => version.id === sourceVersionId)
-          if (current) {
-            setCandidateOverrides((existing) => {
-              const next = { ...existing, [selectedOption!.overrideKey]: { logoVersionId: current.id, imageUrl: current.image_url } }
-              writeCandidateOverrides(next)
-              return next
-            })
-            setSelectedId(sourceVersionId)
-          }
-        }
-      }
       const accepted = await createSingleEditGeneration(
-        sourceVersionId,
+        selectedOptionId,
         instruction.trim() || defaultEditInstruction,
       )
       if (import.meta.env.VITE_USE_MOCK === 'true') return { id: accepted.request_id, imageUrl: null }

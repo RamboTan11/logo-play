@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { CachedImage } from './CachedImage'
 import { LogoArtwork } from './LogoArtwork'
-import { GenerationWaitingState } from './GenerationWaitingState'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 
 export interface ResultEditVersion {
@@ -38,7 +37,7 @@ export function ResultEditDialog({
   useEffect(() => {
     generateButtonRef.current?.focus()
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isGenerating && !isPageBusy) onClose()
+      if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
@@ -47,6 +46,7 @@ export function ResultEditDialog({
   const generate = async () => {
     if (isGenerating || isPageBusy) return
     setIsGenerating(true)
+    setGenerated(null)
     setError(null)
     try {
       const next = await onGenerate(instruction)
@@ -77,27 +77,28 @@ export function ResultEditDialog({
     </div>
   )
 
+  const renderGeneratingArtwork = () => (
+    <div className="result-edit-artwork result-edit-artwork-loading" aria-label={t('新图')}>
+      <span className="result-card-generation-track" aria-hidden="true" />
+    </div>
+  )
+
   return (
     <div className="result-edit-modal" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !isGenerating && !isPageBusy) onClose()
+      if (event.target === event.currentTarget) onClose()
     }}>
       <section className="result-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="result-edit-title">
         <header>
           <div><h2 id="result-edit-title">{t('编辑优化')}</h2><p>{domain}</p></div>
-          <button type="button" aria-label={t('关闭编辑优化')} disabled={isGenerating || isPageBusy} onClick={onClose}>×</button>
+          <button type="button" aria-label={t('关闭编辑优化')} onClick={onClose}>×</button>
         </header>
         <div className="result-edit-body" aria-busy={isGenerating}>
-          {!generated ? <>
-            <section><h3>{t('原图')}</h3>{renderArtwork(source, t('原图'), variant)}</section>
-            <label className="adoption-note-field result-edit-instruction"><span>{t('优化需求（选填）')}</span><textarea value={instruction} disabled={isGenerating || isPageBusy} placeholder={t('可输入您的优化需求，默认重新生成当前相似风格的 logo 图。')} onChange={(event) => setInstruction(event.target.value)} /></label>
-          </> : <section className="result-edit-comparison" aria-label={t('原图与新图对比')}>
+          <section className={`result-edit-comparison ${generated || isGenerating ? 'has-preview' : 'source-only'}`} aria-label={t('原图与新图对比')}>
             <div><h3>{t('原图')}</h3>{renderArtwork(source, t('原图'), variant)}</div>
-            <div><h3>{t('新图')}</h3>{renderArtwork(generated, t('新图'), variant + 1)}</div>
-          </section>}
+            {(generated || isGenerating) && <div><h3>{t('新图')}</h3>{generated ? renderArtwork(generated, t('新图'), variant + 1) : renderGeneratingArtwork()}</div>}
+          </section>
+          <label className="adoption-note-field result-edit-instruction"><span>{t('优化需求（选填）')}</span><textarea value={instruction} disabled={isGenerating || isPageBusy} placeholder={t('可输入您的优化需求，默认重新生成当前相似风格的 logo 图。')} onChange={(event) => setInstruction(event.target.value)} /></label>
           {error && <p className="result-edit-error" role="alert">{error}</p>}
-          {isGenerating && <div className="result-edit-generating-overlay">
-            <GenerationWaitingState title={t('正在生成新版本')} description={t('正在按优化要求生成新方案，结果会自动显示')} />
-          </div>}
         </div>
         <footer>
           {generated && <button className="secondary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void generate()}>{t('重新生成')}</button>}
