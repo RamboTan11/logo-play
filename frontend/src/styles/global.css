@@ -1364,7 +1364,7 @@ button:disabled { cursor:not-allowed; opacity:.55; }
   .generation-results-stage .batch-history-frame { min-height:0; }
   .saved-logo-grid .saved-logo-card { width:260px; min-width:260px; flex-basis:260px; }
 }
-.result-card-failed {
+.results-workspace-grid .result-card.result-card-failed {
   position:relative;
   isolation:isolate;
   display:grid;
