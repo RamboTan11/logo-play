@@ -1,4 +1,3 @@
-import { LoaderCircle } from 'lucide-react'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 
 interface GenerationWaitingStateProps {
@@ -9,7 +8,6 @@ interface GenerationWaitingStateProps {
 export function GenerationWaitingState({ title, description }: GenerationWaitingStateProps) {
   const { t } = useClientLanguage()
   return <div className="generation-waiting-state" role="status" aria-live="polite">
-    <div className="generation-waiting-symbol" aria-hidden="true"><LoaderCircle size={30} strokeWidth={1.8} /></div>
     <div className="generation-waiting-copy">
       <b className="loading-copy">{title}<span className="loading-ellipsis" aria-hidden="true" /></b>
       <span>{description}</span>

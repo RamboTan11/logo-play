@@ -82,7 +82,6 @@ function optionsForBatch(batch: GenerationBatch, candidateOverrides: Record<stri
 
 function GenerationProgressTrack() {
   return <span className="result-card-generation-track" aria-hidden="true">
-    <span className="result-card-generation-mark"><i /><i /><i /></span>
     <span className="result-card-generation-rail"><span /></span>
   </span>
 }
