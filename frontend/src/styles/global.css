@@ -1349,20 +1349,22 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .result-card-failed {
   position:relative;
   isolation:isolate;
-  display:grid;
+  display:flex;
   min-width:0;
   min-height:0;
-  place-items:center;
-  padding:20px;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:13px;
+  padding:22px 20px;
   border-color:rgba(255,107,120,.34);
   background:linear-gradient(145deg,rgba(30,7,12,.88),rgba(12,8,10,.7));
   text-align:center;
 }
 .result-card-failed:hover { border-color:rgba(247,198,90,.5); box-shadow:inset 0 0 0 1px rgba(247,198,90,.05); }
 .result-card-failed>span {
-  position:absolute;
+  position:relative;
   z-index:1;
-  top:calc(50% + 30px);
   max-width:22ch;
   color:#f4d7bc;
   font-size:12px;
@@ -1457,34 +1459,38 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 @media (max-width:520px) { .results-workspace-grid { grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(var(--result-rows,1),minmax(0,1fr)); min-height:0; padding:8px; }.result-edit-modal,.batch-replace-modal { align-items:end; padding:0; }.result-edit-dialog,.batch-replace-dialog { width:100%; max-height:92vh; border-right:0; border-bottom:0; border-left:0; border-radius:8px 8px 0 0; }.result-edit-dialog>header,.result-edit-body,.result-edit-dialog>footer,.batch-replace-dialog>footer { padding-right:16px; padding-left:16px; }.batch-replace-dialog h2 { padding-right:16px; padding-left:16px; }.batch-replace-dialog p { margin-right:16px; margin-left:16px; }.result-edit-comparison { grid-template-columns:1fr; }.result-edit-artwork,.result-edit-artwork .logo-artwork { min-height:0; }.result-primary-actions { gap:8px; } }
 @media (prefers-reduced-motion:reduce) { .result-card,.result-save-icon { transition:none; } }
 .result-slot-retry {
-  position:absolute;
-  z-index:2;
-  top:50%;
-  left:50%;
-  width:38px;
-  height:38px;
+  position:relative;
+  z-index:1;
+  width:44px;
+  height:44px;
   display:grid;
   place-items:center;
-  border:0;
-  background:transparent;
+  flex:none;
+  border:1px solid rgba(247,198,90,.54);
+  border-radius:50%;
+  background:rgba(16,6,8,.72);
   color:var(--gold-bright);
   padding:0;
-  transform:translate(-50%,-50%);
-  transition:color .18s ease,transform .18s ease;
+  box-shadow:0 5px 17px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .24s cubic-bezier(.22,.8,.2,1),border-color .24s ease,background .24s ease,box-shadow .24s ease;
 }
-.result-slot-retry svg { width:28px; height:28px; stroke-width:1.7; }
+.result-slot-retry::before { position:absolute; z-index:-1; inset:-7px; border:1px solid rgba(247,198,90,.34); border-radius:50%; content:""; opacity:.42; animation:result-slot-retry-pulse 2.7s ease-in-out infinite; }
+.result-slot-retry svg { width:20px; height:20px; }
 .result-slot-retry:hover:not(:disabled),.result-slot-retry:focus-visible {
-  color:#fff2bf;
-  outline:2px solid rgba(247,198,90,.58);
-  outline-offset:4px;
-  transform:translate(-50%,-50%) scale(1.08);
+  border-color:var(--gold-bright);
+  background:rgba(55,10,19,.82);
+  box-shadow:0 8px 24px rgba(247,198,90,.18),inset 0 1px 0 rgba(255,255,255,.12);
+  outline:2px solid transparent;
+  transform:translateY(-2px) scale(1.06);
 }
-.result-slot-retry:hover:not(:disabled) svg { transform:rotate(72deg); transition:transform .3s cubic-bezier(.22,.8,.2,1); }
+.result-slot-retry:hover:not(:disabled) svg { transform:rotate(110deg); transition:transform .38s cubic-bezier(.22,.8,.2,1); }
 .result-slot-retry:disabled { cursor:not-allowed; opacity:.48; }
 .result-slot-retry.loading svg { animation:batch-spin .9s linear infinite; }
+@keyframes result-slot-retry-pulse { 0%,100% { opacity:.2; transform:scale(.86); } 48% { opacity:.72; transform:scale(1.04); } }
 @media (prefers-reduced-motion:reduce) {
-  .result-slot-retry,.result-slot-retry:hover:not(:disabled) { transition:none; transform:translate(-50%,-50%); }
-  .result-slot-retry.loading svg { animation:none; }
+  .result-slot-retry,.result-slot-retry:hover:not(:disabled) { transition:none; transform:none; }
+  .result-slot-retry::before,.result-slot-retry.loading svg { animation:none; }
+  .result-slot-retry::before { opacity:.42; transform:none; }
   .result-slot-retry:hover:not(:disabled) svg { transform:none; transition:none; }
 }
 
