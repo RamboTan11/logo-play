@@ -735,8 +735,8 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .creation-results-return {
   position:absolute;
   z-index:3;
-  top:clamp(18px,calc(50% - 240px),220px);
-  right:max(18px,calc(50% - 256px));
+  top:clamp(24px,calc(50% - 264px),140px);
+  right:max(24px,calc(50% - 452px));
   display:inline-grid;
   width:40px;
   height:40px;
