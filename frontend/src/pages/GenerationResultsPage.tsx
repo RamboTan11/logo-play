@@ -81,7 +81,10 @@ function optionsForBatch(batch: GenerationBatch, candidateOverrides: Record<stri
 }
 
 function GenerationProgressTrack() {
-  return <span className="result-card-generation-track" aria-hidden="true"><span /></span>
+  return <span className="result-card-generation-track" aria-hidden="true">
+    <span className="result-card-generation-mark"><i /><i /><i /></span>
+    <span className="result-card-generation-rail"><span /></span>
+  </span>
 }
 
 export function GenerationResultsPage() {
@@ -351,7 +354,7 @@ export function GenerationResultsPage() {
                     </article>
                     if (option.status === 'failed') return <article className="result-card result-card-failed" key={option.id}>
                       <button className={retrying ? 'result-slot-retry loading' : 'result-slot-retry'} aria-label={`${t('重试失败方案')} ${option.slot_index + 1}`} title={t('重试此方案')} disabled={retrying || !option.retry_token || isBusy} onClick={() => option.retry_token && void retrySlot(historyBatch.request_id, option.slot_index, option.retry_token)}><RefreshCw aria-hidden="true" /></button>
-                      <span>{t('此方案生成失败，请重试。')}</span>
+                      <span>{t('开小差了，请重试')}</span>
                     </article>
                     const selected = selectedOption?.id === option.id
                     const saved = option.logoVersionId ? savedIds.has(option.logoVersionId) : false
@@ -369,7 +372,7 @@ export function GenerationResultsPage() {
                     </article>
                   })}
                 </div>
-                {historyOptions.some((option) => option.status === 'processing' || retryingSlots.includes(`${historyBatch.request_id}:${option.slot_index}`)) && <p className="batch-generating-hint">{t('正在探索新的设计方向，生成结果会自动显示')}</p>}
+                {historyOptions.some((option) => option.status === 'processing' || retryingSlots.includes(`${historyBatch.request_id}:${option.slot_index}`)) && <p className="batch-generating-hint">{t('预计需要 1～3 分钟，请稍等。')}</p>}
               </section>)}
               {isRegenerating && !visibleBatches.some((item) => item.status === 'processing') && <section className="batch-history-section batch-history-generating" aria-label={t('正在生成新一批方案')}>
                 <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(Math.max(activeTargetCount ?? batch.target_count, 1)) } as CSSProperties}>
