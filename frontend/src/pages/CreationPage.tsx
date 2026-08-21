@@ -42,29 +42,23 @@ function resolveShowcaseUrl(styleId: string, image: { asset_id: string; content_
   return `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(styleId)}/showcase-images/${encodeURIComponent(image.asset_id)}/content?thumbnail=true`
 }
 
-function preloadShowcaseImage(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
+async function preloadShowcaseImage(url: string, signal: AbortSignal): Promise<string | null> {
+  try {
+    const response = await fetch(url, { cache: 'force-cache', credentials: 'include', signal })
+    if (!response.ok) return null
+    const objectUrl = URL.createObjectURL(await response.blob())
     const image = new Image()
-    let settled = false
-    const finish = (loaded: boolean) => {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timeout)
-      resolve(loaded)
+    image.src = objectUrl
+    try {
+      await image.decode()
+      return objectUrl
+    } catch {
+      URL.revokeObjectURL(objectUrl)
+      return null
     }
-    const timeout = window.setTimeout(() => finish(false), 5000)
-    image.fetchPriority = 'high'
-    image.onload = () => {
-      if (typeof image.decode === 'function') {
-        void image.decode().then(() => finish(true)).catch(() => finish(false))
-      } else {
-        finish(true)
-      }
-    }
-    image.onerror = () => finish(false)
-    image.src = url
-    if (image.complete && image.naturalWidth > 0) image.onload(new Event('load'))
-  })
+  } catch {
+    return null
+  }
 }
 
 export function CreationPage() {
@@ -75,9 +69,12 @@ export function CreationPage() {
   const [isSuffixOpen, setIsSuffixOpen] = useState(false)
   const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([])
   const [showcaseIndexes, setShowcaseIndexes] = useState<Record<string, number>>({})
-  const [styleCatalog, setStyleCatalog] = useState<GenerationStyleCatalogStyleDto[]>([])
+  const [styleCatalogView, setStyleCatalogView] = useState<{
+    styles: GenerationStyleCatalogStyleDto[]
+    urls: Record<string, string>
+  }>({ styles: [], urls: {} })
   const [styleCatalogError, setStyleCatalogError] = useState<string | null>(null)
-  const [showcaseUrls, setShowcaseUrls] = useState<Record<string, string>>({})
+  const showcaseObjectUrlsRef = useRef<string[]>([])
   const [sourceUploadState, setSourceUploadState] = useState(initialGenerationSourceUploadState)
   const sourceInputRef = useRef<HTMLInputElement>(null)
   const sourceRestorationAttemptedRef = useRef(false)
@@ -100,6 +97,7 @@ export function CreationPage() {
     restoreActiveGeneration,
   } = useGenerationStore()
   const showToast = useToastStore((state) => state.showToast)
+  const { styles: styleCatalog, urls: showcaseUrls } = styleCatalogView
 
   const [sourceUpload] = useState(() => new GenerationSourceUploadLifecycle({
       createObjectUrl: (file) => URL.createObjectURL(file),
@@ -131,36 +129,51 @@ export function CreationPage() {
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 5000)
     void getGenerationStyleCatalog().then(async (catalog) => {
       if (!active) return
       const styles = catalog.styles
       const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [image.asset_id, resolveShowcaseUrl(style.id, image)] as const))
-      const urls = Object.fromEntries(resolved)
-      const loaded = await Promise.all(Object.values(urls).map((url) => preloadShowcaseImage(url)))
-      if (!active) return
-      if (!loaded.every(Boolean)) {
-        setStyleCatalog([])
-        setShowcaseUrls({})
+      const preloaded = await Promise.all(resolved.map(async ([assetId, url]) => [
+        assetId,
+        await preloadShowcaseImage(url, controller.signal),
+      ] as const))
+      if (!active) {
+        preloaded.forEach(([, objectUrl]) => { if (objectUrl) URL.revokeObjectURL(objectUrl) })
+        return
+      }
+      if (preloaded.some(([, objectUrl]) => !objectUrl)) {
+        preloaded.forEach(([, objectUrl]) => { if (objectUrl) URL.revokeObjectURL(objectUrl) })
+        setStyleCatalogView({ styles: [], urls: {} })
         setStyleCatalogError('风格样图暂时无法加载，您仍可直接生成。')
         return
       }
-      setStyleCatalog(styles)
+      const urls = Object.fromEntries(preloaded) as Record<string, string>
+      showcaseObjectUrlsRef.current.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+      showcaseObjectUrlsRef.current = Object.values(urls)
+      setStyleCatalogView({ styles, urls })
       setStyleCatalogError(null)
       setSelectedStyleIds((current) => current.filter((id) => styles.some((style) => style.id === id)))
       setShowcaseIndexes((current) => Object.fromEntries(styles.map((style) => [
         style.id,
         Math.min(Math.max(current[style.id] ?? 0, 0), Math.max(style.showcase_images.length - 1, 0)),
       ])))
-      setShowcaseUrls(urls)
     }).catch(() => {
       if (!active) return
-      setStyleCatalog([])
-      setShowcaseUrls({})
+      setStyleCatalogView({ styles: [], urls: {} })
       setStyleCatalogError('风格目录暂时无法加载，您仍可直接生成。')
-    })
+    }).finally(() => window.clearTimeout(timeout))
     return () => {
       active = false
+      controller.abort()
+      window.clearTimeout(timeout)
     }
+  }, [])
+
+  useEffect(() => () => {
+    showcaseObjectUrlsRef.current.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+    showcaseObjectUrlsRef.current = []
   }, [])
 
   useEffect(() => {
