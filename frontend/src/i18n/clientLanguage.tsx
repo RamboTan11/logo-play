@@ -46,7 +46,7 @@ const english: Record<string, string> = {
   '快速生成您的创意 logo': 'Quickly generate your creative logo',
   '必填': 'Required',
   '默认使用您输入域名中的 2～3 个字符设计': 'By default, 2-3 characters from your domain are used in the design.',
-  '猜你喜欢': 'You may like',
+  '猜您喜欢': 'Picked for you',
   '已选择': 'Selected',
   '选择喜欢的 Logo 类型': 'Choose logo styles you like',
   '重叠融合': 'Overlapping fusion',

@@ -32,6 +32,30 @@ function filenameWithoutExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, '')
 }
 
+function preloadShowcaseImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image()
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      resolve()
+    }
+    const timeout = window.setTimeout(finish, 10000)
+    image.onload = () => {
+      if (typeof image.decode === 'function') {
+        void image.decode().catch(() => undefined).finally(finish)
+      } else {
+        finish()
+      }
+    }
+    image.onerror = finish
+    image.src = url
+    if (image.complete && image.naturalWidth > 0) image.onload(new Event('load'))
+  })
+}
+
 export function CreationPage() {
   const { t } = useClientLanguage()
   const navigate = useNavigate()
@@ -99,6 +123,13 @@ export function CreationPage() {
     void getGenerationStyleCatalog().then(async (catalog) => {
       if (!active) return
       const styles = catalog.styles
+      const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [
+        image.asset_id,
+        image.content_url || `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(style.id)}/showcase-images/${encodeURIComponent(image.asset_id)}/content`,
+      ] as const))
+      const urls = Object.fromEntries(resolved)
+      await Promise.all(Object.values(urls).map((url) => preloadShowcaseImage(url)))
+      if (!active) return
       setStyleCatalog(styles)
       setStyleCatalogError(null)
       setSelectedStyleIds((current) => current.filter((id) => styles.some((style) => style.id === id)))
@@ -106,12 +137,7 @@ export function CreationPage() {
         style.id,
         Math.min(Math.max(current[style.id] ?? 0, 0), Math.max(style.showcase_images.length - 1, 0)),
       ])))
-
-      const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [
-        image.asset_id,
-        image.content_url || `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(style.id)}/showcase-images/${encodeURIComponent(image.asset_id)}/content`,
-      ] as const))
-      if (active) setShowcaseUrls(Object.fromEntries(resolved))
+      setShowcaseUrls(urls)
     }).catch(() => {
       if (!active) return
       setStyleCatalog([])
@@ -335,7 +361,7 @@ export function CreationPage() {
           <section className="creation-style-picker" aria-labelledby="creation-style-picker-title">
             <div className="creation-style-heading">
               <span>{t('选填')}</span>
-              <h3 id="creation-style-picker-title">{t('猜你喜欢')}</h3>
+              <h3 id="creation-style-picker-title">{t('猜您喜欢')}</h3>
             </div>
             <div className="creation-style-catalog" role="group" aria-label={t('选择喜欢的 Logo 类型')}>
               {styleCatalog.map((style) => {
