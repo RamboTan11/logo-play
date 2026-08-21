@@ -352,8 +352,10 @@ export function GenerationResultsPage() {
                       <GenerationProgressTrack />
                     </article>
                     if (option.status === 'failed') return <article className="result-card result-card-failed" key={option.id}>
-                      <button className={retrying ? 'result-slot-retry loading' : 'result-slot-retry'} aria-label={`${t('重试失败方案')} ${option.slot_index + 1}`} title={t('重试此方案')} disabled={retrying || !option.retry_token || isBusy} onClick={() => option.retry_token && void retrySlot(historyBatch.request_id, option.slot_index, option.retry_token)}><RefreshCw aria-hidden="true" /></button>
-                      <span>{t('开小差了，请重试')}</span>
+                      <div className="result-card-failed-content">
+                        <button className={retrying ? 'result-slot-retry loading' : 'result-slot-retry'} aria-label={`${t('重试失败方案')} ${option.slot_index + 1}`} title={t('重试此方案')} disabled={retrying || !option.retry_token || isBusy} onClick={() => option.retry_token && void retrySlot(historyBatch.request_id, option.slot_index, option.retry_token)}><RefreshCw aria-hidden="true" /></button>
+                        <span>{t('开小差了，请重试')}</span>
+                      </div>
                     </article>
                     const selected = selectedOption?.id === option.id
                     const saved = option.logoVersionId ? savedIds.has(option.logoVersionId) : false
