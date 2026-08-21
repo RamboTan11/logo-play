@@ -646,7 +646,7 @@ export function BatchGenerationPolicyPage() {
               {image.previewUrl ? <img src={image.previewUrl} alt={image.filename} /> : <div className="style-showcase-placeholder"><FileImage size={18} /></div>}
               <button className="strategy-icon-button danger" type="button" title="删除展示样图" aria-label="删除展示样图" onClick={() => removeShowcaseImage(image.key)} disabled={isUploading}><X size={14} /></button>
             </div>)}
-            {styleForm.showcaseImages.length < 3 && <label className="style-showcase-add" title="上传展示样图"><ImagePlus size={18} /><span>上传</span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isUploading} onChange={(event) => { chooseShowcaseImages(Array.from(event.target.files ?? [])); event.currentTarget.value = '' }} /></label>}
+            {styleForm.showcaseImages.length < 3 && <label className="style-showcase-add" title="上传展示样图"><span className="style-showcase-add-content"><ImagePlus size={18} /><span>上传</span></span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isUploading} onChange={(event) => { chooseShowcaseImages(Array.from(event.target.files ?? [])); event.currentTarget.value = '' }} /></label>}
           </div>
         </div>
         {modalError && <p className="strategy-form-error">{modalError}</p>}

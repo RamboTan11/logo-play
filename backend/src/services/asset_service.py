@@ -212,6 +212,9 @@ class AssetService:
             original_filename=original_filename,
         )
         session.add(record)
+        # Showcase files are rendered only as small catalog cards. Persisting the
+        # preview at upload time keeps the customer's first view off the original.
+        await asyncio.to_thread(self._storage.write_thumbnail, stored.storage_key, content)
         await self._events.record_audit(
             session,
             action="batch_style_showcase.created",
@@ -370,15 +373,25 @@ class AssetService:
             raise LookupError("Reference image not found") from error
 
     async def read_batch_style_showcase(
-        self, session: AsyncSession, asset_id: str
-    ) -> tuple[AssetRecord, bytes]:
+        self, session: AsyncSession, asset_id: str, *, thumbnail: bool = False
+    ) -> tuple[AssetRecord, bytes, bool]:
         """Read a customer preview image after the route verified catalog membership."""
 
         record = await session.get(AssetRecord, asset_id)
         if record is None or record.purpose != BATCH_STYLE_SHOWCASE_PURPOSE:
             raise LookupError("Style showcase image not found")
         try:
-            return record, self._storage.read(record.storage_key)
+            content = self._storage.read(record.storage_key)
+            if thumbnail:
+                try:
+                    return record, await asyncio.to_thread(
+                        self._storage.read_thumbnail, record.storage_key, content
+                    ), True
+                except ValueError:
+                    # Legacy records can have a valid file signature but no
+                    # decodable pixels. Keep their original protected preview available.
+                    return record, content, False
+            return record, content, False
         except OSError as error:
             raise LookupError("Style showcase image not found") from error
 

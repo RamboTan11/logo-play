@@ -11,7 +11,7 @@ from src.api.deps import require_admin, require_customer
 from src.db.models import AssetRecord
 from src.db.session import get_db
 from src.models.batch_generation_policy import BatchPolicyPayload
-from src.services.asset_service import AssetService, LocalFallbackAssetStorage
+from src.services.asset_service import AssetService, LocalFallbackAssetStorage, THUMBNAIL_MEDIA_TYPE
 from src.services.auth_service import AuthenticatedPrincipal
 from src.services.batch_generation_policy_service import (
     BatchGenerationPolicyService,
@@ -138,17 +138,20 @@ async def read_showcase_image_content(
     _: AdminDependency,
     session: DatabaseDependency,
     assets: AssetDependency,
+    thumbnail: bool = Query(True),
 ) -> Response:
     """Return protected admin preview bytes for a style showcase draft."""
 
     try:
-        record, content = await assets.read_batch_style_showcase(session, asset_id)
+        record, content, is_thumbnail = await assets.read_batch_style_showcase(
+            session, asset_id, thumbnail=thumbnail
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail="Showcase image not found") from error
     return Response(
         content=content,
-        media_type=record.media_type,
-        headers={"Cache-Control": "private, no-store"},
+        media_type=THUMBNAIL_MEDIA_TYPE if is_thumbnail else record.media_type,
+        headers={"Cache-Control": "private, max-age=86400, immutable"},
     )
 
 
@@ -173,19 +176,22 @@ async def read_generation_style_showcase_content(
     session: DatabaseDependency,
     service: PolicyDependency,
     assets: AssetDependency,
+    thumbnail: bool = Query(True),
 ) -> Response:
     """Serve one catalog image only when it remains in the published customer catalog."""
 
     if not await service.has_customer_showcase_image(session, style_id, asset_id):
         raise HTTPException(status_code=404, detail="Style showcase image not found")
     try:
-        record, content = await assets.read_batch_style_showcase(session, asset_id)
+        record, content, is_thumbnail = await assets.read_batch_style_showcase(
+            session, asset_id, thumbnail=thumbnail
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail="Style showcase image not found") from error
     return Response(
         content=content,
-        media_type=record.media_type,
-        headers={"Cache-Control": "private, no-store"},
+        media_type=THUMBNAIL_MEDIA_TYPE if is_thumbnail else record.media_type,
+        headers={"Cache-Control": "private, max-age=86400, immutable"},
     )
 
 

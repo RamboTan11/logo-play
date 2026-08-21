@@ -32,25 +32,36 @@ function filenameWithoutExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, '')
 }
 
-function preloadShowcaseImage(url: string): Promise<void> {
+function resolveShowcaseUrl(styleId: string, image: { asset_id: string; content_url: string }): string {
+  const contentUrl = image.content_url.trim()
+  if (contentUrl) {
+    return contentUrl.startsWith('/api/')
+      ? `${import.meta.env.BASE_URL}${contentUrl.slice(1)}`
+      : contentUrl
+  }
+  return `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(styleId)}/showcase-images/${encodeURIComponent(image.asset_id)}/content?thumbnail=true`
+}
+
+function preloadShowcaseImage(url: string): Promise<boolean> {
   return new Promise((resolve) => {
     const image = new Image()
     let settled = false
-    const finish = () => {
+    const finish = (loaded: boolean) => {
       if (settled) return
       settled = true
       window.clearTimeout(timeout)
-      resolve()
+      resolve(loaded)
     }
-    const timeout = window.setTimeout(finish, 10000)
+    const timeout = window.setTimeout(() => finish(false), 5000)
+    image.fetchPriority = 'high'
     image.onload = () => {
       if (typeof image.decode === 'function') {
-        void image.decode().catch(() => undefined).finally(finish)
+        void image.decode().then(() => finish(true)).catch(() => finish(false))
       } else {
-        finish()
+        finish(true)
       }
     }
-    image.onerror = finish
+    image.onerror = () => finish(false)
     image.src = url
     if (image.complete && image.naturalWidth > 0) image.onload(new Event('load'))
   })
@@ -123,13 +134,16 @@ export function CreationPage() {
     void getGenerationStyleCatalog().then(async (catalog) => {
       if (!active) return
       const styles = catalog.styles
-      const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [
-        image.asset_id,
-        image.content_url || `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(style.id)}/showcase-images/${encodeURIComponent(image.asset_id)}/content`,
-      ] as const))
+      const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [image.asset_id, resolveShowcaseUrl(style.id, image)] as const))
       const urls = Object.fromEntries(resolved)
-      await Promise.all(Object.values(urls).map((url) => preloadShowcaseImage(url)))
+      const loaded = await Promise.all(Object.values(urls).map((url) => preloadShowcaseImage(url)))
       if (!active) return
+      if (!loaded.every(Boolean)) {
+        setStyleCatalog([])
+        setShowcaseUrls({})
+        setStyleCatalogError('风格样图暂时无法加载，您仍可直接生成。')
+        return
+      }
       setStyleCatalog(styles)
       setStyleCatalogError(null)
       setSelectedStyleIds((current) => current.filter((id) => styles.some((style) => style.id === id)))
