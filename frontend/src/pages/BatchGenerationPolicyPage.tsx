@@ -31,7 +31,6 @@ import {
 interface StyleFormState {
   id: string | null
   name: string
-  description: string
   showcaseImages: ShowcaseImageDraft[]
 }
 
@@ -267,8 +266,7 @@ export function BatchGenerationPolicyPage() {
     const form: StyleFormState = {
       id: style?.id ?? null,
       name: style?.name ?? '',
-      description: style?.description ?? '',
-    showcaseImages: (style?.showcase_image_asset_ids ?? []).map((assetId) => ({
+      showcaseImages: (style?.showcase_image_asset_ids ?? []).map((assetId) => ({
       key: assetId,
       assetId,
       previewUrl: showcaseAssetContentUrl(assetId),
@@ -335,13 +333,13 @@ export function BatchGenerationPolicyPage() {
       ? currentDraft.styles.map((style) => style.id === styleForm.id ? {
         ...style,
         name: styleForm.name,
-        description: styleForm.description,
+        description: '',
         showcase_image_asset_ids: showcaseImageAssetIds,
       } : style)
       : [...currentDraft.styles, {
         id: nextDraftId('draft-style'),
         name: styleForm.name,
-        description: styleForm.description,
+        description: '',
         showcase_image_asset_ids: showcaseImageAssetIds,
         generation_count: 0,
         templates: [],
@@ -641,7 +639,6 @@ export function BatchGenerationPolicyPage() {
         footer={<><button className="internal-button" type="button" disabled={draftSaveState === 'saving' || isUploading} onClick={closeStyleForm}>取消</button><button className="internal-button primary" type="button" disabled={draftSaveState === 'saving' || isUploading} onClick={() => void applyStyleForm()}>{isUploading || draftSaveState === 'saving' ? '正在保存...' : '完成'}</button></>}
       ><div className="strategy-form single-column">
         <label><span>风格名称 <b>*</b></span><input autoFocus value={styleForm.name} onChange={(event) => setStyleForm({ ...styleForm, name: event.target.value })} placeholder="如：极简科技" maxLength={32} /></label>
-        <label><span>客户简介</span><textarea value={styleForm.description} onChange={(event) => setStyleForm({ ...styleForm, description: event.target.value })} placeholder="用于前台向客户介绍该风格" maxLength={280} /></label>
         <div className="style-showcase-editor">
           <span>展示样图 <small>请上传 1～3 张风格类型样图，该图片不参与模型生图</small></span>
           <div className="style-showcase-list">

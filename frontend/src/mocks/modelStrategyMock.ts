@@ -155,9 +155,6 @@ export function validateBatchPolicy(policy: BatchPolicyPayloadDto, context: Comp
     if (style.generation_count > 0 && !style.templates.some(isCompleteBatchTemplate)) {
       errors.push({ field: `${stylePrefix}.generation_count`, code: 'required', message: '创建完整模板后才可设置生成数' })
     }
-    if (style.generation_count > 0 && !style.description.trim()) {
-      errors.push({ field: `${stylePrefix}.description`, code: 'required', message: '请填写客户简介' })
-    }
     if (style.generation_count > 0 && (style.showcase_image_asset_ids.length < 1 || style.showcase_image_asset_ids.length > 3)) {
       errors.push({ field: `${stylePrefix}.showcase_image_asset_ids`, code: 'invalid_showcase_image', message: '请上传 1 至 3 张客户展示样图' })
     }
@@ -485,12 +482,11 @@ export async function getGenerationStyleCatalogMock(): Promise<GenerationStyleCa
   return {
     policy_version_id: active?.id ?? '',
     styles: (active?.styles_snapshot ?? []).flatMap((style) => (
-      style.generation_count > 0 && style.description.trim() && style.showcase_image_asset_ids.length
+      style.generation_count > 0 && style.showcase_image_asset_ids.length
         ? [{
-            id: style.id,
-            name: style.name,
-            description: style.description,
-            showcase_images: style.showcase_image_asset_ids.map((assetId) => ({
+          id: style.id,
+          name: style.name,
+          showcase_images: style.showcase_image_asset_ids.map((assetId) => ({
               asset_id: assetId,
               content_url: `/api/v1/generation-style-catalog/styles/${style.id}/showcase-images/${assetId}/content`,
               filename: `${style.name}-样图-${style.showcase_image_asset_ids.indexOf(assetId) + 1}.png`,

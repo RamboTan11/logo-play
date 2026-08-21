@@ -436,7 +436,6 @@ class BatchGenerationPolicyService:
             asset_ids = style.showcase_image_asset_ids
             if (
                 style.generation_count <= 0
-                or not style.description.strip()
                 or not 1 <= len(asset_ids) <= 3
                 or len(set(asset_ids)) != len(asset_ids)
                 or any(asset_id not in records for asset_id in asset_ids)
@@ -447,7 +446,6 @@ class BatchGenerationPolicyService:
                 GenerationStyleCatalogStyleDto(
                     id=style.id,
                     name=style.name,
-                    description=style.description,
                     showcase_images=[
                         GenerationStyleShowcaseImageDto(
                             asset_id=asset_id,
@@ -488,12 +486,6 @@ class BatchGenerationPolicyService:
             if style.generation_count <= 0:
                 continue
             prefix = f"styles[{index}]"
-            if not style.description.strip():
-                errors.append(
-                    StrategyValidationErrorDto(
-                        field=f"{prefix}.description", code="required", message="请填写客户简介"
-                    )
-                )
             image_ids = style.showcase_image_asset_ids
             if not 1 <= len(image_ids) <= 3:
                 errors.append(

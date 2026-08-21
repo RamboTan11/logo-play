@@ -88,7 +88,6 @@ export interface GenerationStyleShowcaseImageDto {
 export interface GenerationStyleCatalogStyleDto {
   id: string
   name: string
-  description: string
   showcase_images: GenerationStyleShowcaseImageDto[]
 }
 

@@ -104,7 +104,6 @@ class GenerationStyleCatalogStyleDto(BaseModel):
 
     id: str
     name: str
-    description: str
     showcase_images: list[GenerationStyleShowcaseImageDto]
 
 

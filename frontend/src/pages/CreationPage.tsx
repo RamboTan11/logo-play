@@ -39,12 +39,10 @@ export function CreationPage() {
   const suffixTriggerRef = useRef<HTMLButtonElement>(null)
   const [isSuffixOpen, setIsSuffixOpen] = useState(false)
   const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([])
-  const [previewedStyleId, setPreviewedStyleId] = useState<string | null>(null)
-  const [previewedShowcaseIndex, setPreviewedShowcaseIndex] = useState(0)
+  const [showcaseIndexes, setShowcaseIndexes] = useState<Record<string, number>>({})
   const [styleCatalog, setStyleCatalog] = useState<GenerationStyleCatalogStyleDto[]>([])
   const [styleCatalogError, setStyleCatalogError] = useState<string | null>(null)
   const [showcaseUrls, setShowcaseUrls] = useState<Record<string, string>>({})
-  const [showcaseLightbox, setShowcaseLightbox] = useState<{ src: string; alt: string } | null>(null)
   const [sourceUploadState, setSourceUploadState] = useState(initialGenerationSourceUploadState)
   const sourceInputRef = useRef<HTMLInputElement>(null)
   const sourceRestorationAttemptedRef = useRef(false)
@@ -104,10 +102,10 @@ export function CreationPage() {
       setStyleCatalog(styles)
       setStyleCatalogError(null)
       setSelectedStyleIds((current) => current.filter((id) => styles.some((style) => style.id === id)))
-      setPreviewedStyleId((current) => current && styles.some((style) => style.id === current)
-        ? current
-        : null)
-      setPreviewedShowcaseIndex(0)
+      setShowcaseIndexes((current) => Object.fromEntries(styles.map((style) => [
+        style.id,
+        Math.min(Math.max(current[style.id] ?? 0, 0), Math.max(style.showcase_images.length - 1, 0)),
+      ])))
 
       const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [
         image.asset_id,
@@ -181,15 +179,6 @@ export function CreationPage() {
     }
   }, [isSuffixOpen])
 
-  useEffect(() => {
-    if (!showcaseLightbox) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setShowcaseLightbox(null)
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [showcaseLightbox])
-
   const notifyGenerationBusy = () => showToast(t('正在执行生图任务，请稍后。'))
 
   const selectSuffix = (suffix: typeof domainSuffix) => {
@@ -245,11 +234,9 @@ export function CreationPage() {
   }
 
   const hasCompletedResults = completedGeneration !== null
-  const previewedStyle = styleCatalog.find((style) => style.id === previewedStyleId) ?? null
-  const previewedShowcase = previewedStyle?.showcase_images[previewedShowcaseIndex] ?? null
-  const previewedShowcaseFilename = previewedShowcase?.filename?.trim()
-    ? filenameWithoutExtension(previewedShowcase.filename.trim())
-    : ''
+  const selectedStyleNames = styleCatalog
+    .filter((style) => selectedStyleIds.includes(style.id))
+    .map((style) => style.name)
 
   const toggleStyle = (styleId: string) => {
     const isSelected = selectedStyleIds.includes(styleId)
@@ -257,18 +244,16 @@ export function CreationPage() {
       ? selectedStyleIds.filter((id) => id !== styleId)
       : [...selectedStyleIds, styleId]
     setSelectedStyleIds(nextSelectedStyleIds)
-    setPreviewedStyleId(isSelected
-      ? (previewedStyleId === styleId ? nextSelectedStyleIds[0] ?? null : previewedStyleId)
-      : styleId)
-    setPreviewedShowcaseIndex(0)
   }
 
-  const changeShowcase = (direction: -1 | 1) => {
-    if (!previewedStyle) return
-    setPreviewedShowcaseIndex((current) => Math.min(
-      previewedStyle.showcase_images.length - 1,
-      Math.max(0, current + direction),
-    ))
+  const changeShowcase = (style: GenerationStyleCatalogStyleDto, direction: -1 | 1) => {
+    setShowcaseIndexes((current) => ({
+      ...current,
+      [style.id]: Math.min(
+        style.showcase_images.length - 1,
+        Math.max(0, (current[style.id] ?? 0) + direction),
+      ),
+    }))
   }
 
   const handleGenerate = async () => {
@@ -352,53 +337,54 @@ export function CreationPage() {
               <span>{t('选填')}</span>
               <h3 id="creation-style-picker-title">{t('猜你喜欢')}</h3>
             </div>
-            <div className="creation-style-tags" role="group" aria-label={t('选择喜欢的 Logo 类型')}>
-              {styleCatalog.map((style) => <button
-                className={selectedStyleIds.includes(style.id) ? 'active' : ''}
-                type="button"
-                key={style.id}
-                aria-pressed={selectedStyleIds.includes(style.id)}
-                onClick={() => toggleStyle(style.id)}
-              >{t(style.name)}</button>)}
-            </div>
-            {styleCatalogError && <p className="creation-style-catalog-error" role="status">{t(styleCatalogError)}</p>}
-            {previewedStyle && previewedShowcase && <article className="creation-style-preview" aria-live="polite">
-              <div className="creation-style-showcase">
-                <div className="creation-showcase-stage">
-                  {showcaseUrls[previewedShowcase.asset_id]
-                    ? <button
-                      className="creation-showcase-image-button"
+            <div className="creation-style-catalog" role="group" aria-label={t('选择喜欢的 Logo 类型')}>
+              {styleCatalog.map((style) => {
+                const showcaseIndex = showcaseIndexes[style.id] ?? 0
+                const showcase = style.showcase_images[showcaseIndex]
+                const showcaseFilename = showcase?.filename?.trim()
+                  ? filenameWithoutExtension(showcase.filename.trim())
+                  : ''
+                const isSelected = selectedStyleIds.includes(style.id)
+                if (!showcase) return null
+                return <article className={`creation-style-card${isSelected ? ' active' : ''}`} key={style.id}>
+                  <button
+                    className="creation-style-card-title"
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => toggleStyle(style.id)}
+                  >{style.name}</button>
+                  <div className="creation-showcase-stage">
+                    {showcaseUrls[showcase.asset_id]
+                      ? <button
+                        className="creation-showcase-image-button"
+                        type="button"
+                        aria-pressed={isSelected}
+                        aria-label={`${t('选择喜欢的 Logo 类型')}：${style.name}`}
+                        onClick={() => toggleStyle(style.id)}
+                      ><img src={showcaseUrls[showcase.asset_id]} alt={style.name} /></button>
+                      : <div className="creation-style-showcase-loading" aria-label={t('正在加载样图')} />}
+                    <button
+                      className="creation-showcase-nav creation-showcase-previous"
                       type="button"
-                      aria-label={t('放大查看样图')}
-                      title={t('放大查看样图')}
-                      onClick={() => setShowcaseLightbox({ src: showcaseUrls[previewedShowcase.asset_id]!, alt: t(`${previewedStyle.name}样图`) })}
-                    ><img src={showcaseUrls[previewedShowcase.asset_id]} alt={t(`${previewedStyle.name}样图`)} /></button>
-                    : <div className="creation-style-showcase-loading" aria-label={t('正在加载样图')} />}
-                  <button
-                    className="creation-showcase-nav creation-showcase-previous"
-                    type="button"
-                    aria-label={t('上一张样图')}
-                    disabled={previewedShowcaseIndex === 0}
-                    onClick={() => changeShowcase(-1)}
-                  ><ChevronLeft size={18} aria-hidden="true" /></button>
-                  <button
-                    className="creation-showcase-nav creation-showcase-next"
-                    type="button"
-                    aria-label={t('下一张样图')}
-                    disabled={previewedShowcaseIndex === previewedStyle.showcase_images.length - 1}
-                    onClick={() => changeShowcase(1)}
-                  ><ChevronRight size={18} aria-hidden="true" /></button>
-                </div>
-                <div className="creation-showcase-meta">
-                  {previewedShowcaseFilename && <small className="creation-showcase-name" title={previewedShowcaseFilename}>{previewedShowcaseFilename}</small>}
-                  <small className="creation-showcase-count">{previewedShowcaseIndex + 1}/{previewedStyle.showcase_images.length}</small>
-                </div>
-              </div>
-              <div className="creation-style-copy">
-                <strong>{t(previewedStyle.name)}</strong>
-                <p>{t(previewedStyle.description)}</p>
-              </div>
-            </article>}
+                      aria-label={t('上一张样图')}
+                      disabled={showcaseIndex === 0}
+                      onClick={() => changeShowcase(style, -1)}
+                    ><ChevronLeft size={18} aria-hidden="true" /></button>
+                    <button
+                      className="creation-showcase-nav creation-showcase-next"
+                      type="button"
+                      aria-label={t('下一张样图')}
+                      disabled={showcaseIndex === style.showcase_images.length - 1}
+                      onClick={() => changeShowcase(style, 1)}
+                    ><ChevronRight size={18} aria-hidden="true" /></button>
+                    <small className="creation-showcase-count">{showcaseIndex + 1}/{style.showcase_images.length}</small>
+                  </div>
+                  {showcaseFilename && <small className="creation-showcase-name" title={showcaseFilename}>{showcaseFilename}</small>}
+                </article>
+              })}
+            </div>
+            {selectedStyleNames.length > 0 && <p className="creation-style-selection" role="status">{t('已选择')} {selectedStyleNames.join('、')}</p>}
+            {styleCatalogError && <p className="creation-style-catalog-error" role="status">{t(styleCatalogError)}</p>}
           </section>
           <div className="creation-source-control">
             <div className="creation-source-preview-row">
@@ -409,7 +395,7 @@ export function CreationPage() {
               >
                 {sourcePreviewUrl ? <img src={sourcePreviewUrl} alt={sourceFilename ?? t('视觉参考')} /> : <label className="creation-source-trigger" title={t('上传视觉参考（选填）')} aria-label={t('上传视觉参考（选填）')} onClick={() => { if (isProcessing || isRegenerating) notifyGenerationBusy() }}>
                   <Plus size={21} aria-hidden="true" />
-                  <small>{t('选填')}</small>
+                  <small>{t('参考图')}</small>
                   <input ref={sourceInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={isUploadingSource || isProcessing || isRegenerating} onChange={(event) => { void chooseSourceImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
                 </label>}
                 {isUploadingSource && <div className="creation-source-upload-status" role="status" aria-label={t('正在上传视觉参考')}>
@@ -432,16 +418,6 @@ export function CreationPage() {
           </footer>
         </section>
       </main>
-      {showcaseLightbox && <div
-        className="strategy-lightbox creation-showcase-lightbox"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('样图预览')}
-        onMouseDown={(event) => { if (event.target === event.currentTarget) setShowcaseLightbox(null) }}
-      >
-        <button type="button" className="strategy-lightbox-close" title={t('关闭预览')} aria-label={t('关闭预览')} onClick={() => setShowcaseLightbox(null)}><X size={18} /></button>
-        <img src={showcaseLightbox.src} alt={showcaseLightbox.alt} />
-      </div>}
     </ClientShell>
   )
 }
