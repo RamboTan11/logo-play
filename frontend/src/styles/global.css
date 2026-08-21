@@ -724,15 +724,6 @@ button:disabled { cursor:not-allowed; opacity:.55; }
   .generation-waiting-track>span { width:100%; opacity:.62; transform:none; }
 }
 
-.creation-generating-stage {
-  min-height:300px;
-  display:grid;
-  place-items:center;
-  border:1px solid rgba(247,198,90,.3);
-  border-radius:8px;
-  background:rgba(20,6,9,.78);
-  box-shadow:inset 0 0 0 1px rgba(247,198,90,.04),0 22px 60px rgba(0,0,0,.24);
-}
 .minimal-domain-main { position:relative; }
 .creation-results-return {
   position:absolute;

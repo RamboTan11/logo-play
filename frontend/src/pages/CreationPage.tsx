@@ -2,7 +2,6 @@ import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle
 import { type ClipboardEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientShell } from '../components/ClientShell'
-import { GenerationWaitingState } from '../components/GenerationWaitingState'
 import { useGenerationStore } from '../stores/useGenerationStore'
 import { rememberLastCreationPath } from '../utils/clientNavigation'
 import {
@@ -272,6 +271,16 @@ export function CreationPage() {
     ))
   }
 
+  const handleGenerate = async () => {
+    if (isProcessing || isRegenerating) {
+      notifyGenerationBusy()
+      return
+    }
+    await generate(selectedStyleIds)
+    const state = useGenerationStore.getState()
+    if (state.isProcessing && !state.isRegenerating) navigate('/results')
+  }
+
   return (
     <ClientShell>
       <main className="client-main creation-main minimal-domain-main" onPaste={handlePaste}>
@@ -286,9 +295,7 @@ export function CreationPage() {
         >
           <ArrowRight size={19} strokeWidth={2.2} aria-hidden="true" />
         </button>}
-        {isProcessing ? <section className="minimal-domain-stage creation-generating-stage" aria-busy="true">
-          <GenerationWaitingState title={t('正在生成 Logo 方案')} description={t('正在根据您的域名探索设计方向，生成结果会自动显示')} />
-        </section> : <section className="minimal-domain-stage creation-card" aria-live="polite">
+        <section className="minimal-domain-stage creation-card" aria-live="polite">
           <header className="creation-card-intro">
             <span>{t('从品牌域名开始')}</span>
             <h2>{t('快速生成您的创意 logo')}</h2>
@@ -306,8 +313,8 @@ export function CreationPage() {
               value={domainLabel}
               placeholder={t('请输入域名前缀，如 igame')}
               onChange={(event) => setDomainLabel(event.target.value)}
-              readOnly={isRegenerating}
-              onClick={() => { if (isRegenerating) notifyGenerationBusy() }}
+              readOnly={isProcessing || isRegenerating}
+              onClick={() => { if (isProcessing || isRegenerating) notifyGenerationBusy() }}
             />
             <div className="domain-suffix-control" ref={suffixControlRef}>
               <button
@@ -318,7 +325,7 @@ export function CreationPage() {
                 aria-haspopup="listbox"
                 aria-expanded={isSuffixOpen}
                 aria-controls="domain-suffix-options"
-                onClick={() => { if (isRegenerating) notifyGenerationBusy(); else setIsSuffixOpen((open) => !open) }}
+                onClick={() => { if (isProcessing || isRegenerating) notifyGenerationBusy(); else setIsSuffixOpen((open) => !open) }}
                 onKeyDown={(event) => {
                   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
                   event.preventDefault()
@@ -400,10 +407,10 @@ export function CreationPage() {
                 title={isUploadingSource ? t('正在上传视觉参考') : sourceFilename ?? t('上传视觉参考')}
                 aria-busy={isUploadingSource}
               >
-                {sourcePreviewUrl ? <img src={sourcePreviewUrl} alt={sourceFilename ?? t('视觉参考')} /> : <label className="creation-source-trigger" title={t('上传视觉参考（选填）')} aria-label={t('上传视觉参考（选填）')} onClick={() => { if (isRegenerating) notifyGenerationBusy() }}>
+                {sourcePreviewUrl ? <img src={sourcePreviewUrl} alt={sourceFilename ?? t('视觉参考')} /> : <label className="creation-source-trigger" title={t('上传视觉参考（选填）')} aria-label={t('上传视觉参考（选填）')} onClick={() => { if (isProcessing || isRegenerating) notifyGenerationBusy() }}>
                   <Plus size={21} aria-hidden="true" />
                   <small>{t('选填')}</small>
-                  <input ref={sourceInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={isUploadingSource || isRegenerating} onChange={(event) => { void chooseSourceImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
+                  <input ref={sourceInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={isUploadingSource || isProcessing || isRegenerating} onChange={(event) => { void chooseSourceImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
                 </label>}
                 {isUploadingSource && <div className="creation-source-upload-status" role="status" aria-label={t('正在上传视觉参考')}>
                   <LoaderCircle size={23} aria-hidden="true" />
@@ -412,7 +419,7 @@ export function CreationPage() {
                 {!isUploadingSource && sourceImageAssetId && <button className="creation-source-preview-remove" type="button" title={t('删除视觉参考')} aria-label={t('删除视觉参考')} onClick={removeSourceImage}><X size={14} aria-hidden="true" /></button>}
               </div>
               <div className="creation-source-side">
-                <label className="creation-reference-requirement"><span className="creation-reference-label">{t('创作要求（选填）')}</span><textarea aria-label={t('创作要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。')} readOnly={isRegenerating} onClick={() => { if (isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
+                <label className="creation-reference-requirement"><span className="creation-reference-label">{t('创作要求（选填）')}</span><textarea aria-label={t('创作要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。')} readOnly={isProcessing || isRegenerating} onClick={() => { if (isProcessing || isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
               </div>
             </div>
           </div>
@@ -421,9 +428,9 @@ export function CreationPage() {
               <b>{t('将为您生成创意初稿')}</b>
               <p>{t('采用后由我们继续优化为最终成品')}</p>
             </div>
-            <button className="primary" type="button" disabled={!sourceUpload.canGenerate()} onClick={() => { if (isRegenerating) notifyGenerationBusy(); else void generate(selectedStyleIds) }}>{t('生成创意初稿')}</button>
+            <button className="primary" type="button" disabled={!sourceUpload.canGenerate()} onClick={() => void handleGenerate()}>{t('生成创意初稿')}</button>
           </footer>
-        </section>}
+        </section>
       </main>
       {showcaseLightbox && <div
         className="strategy-lightbox creation-showcase-lightbox"
