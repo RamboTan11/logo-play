@@ -7,7 +7,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.deps import require_admin
+from src.api.deps import require_admin, require_customer
 from src.db.models import AssetRecord
 from src.db.session import get_db
 from src.models.batch_generation_policy import BatchPolicyPayload
@@ -42,6 +42,7 @@ def get_asset_service(request: Request) -> AssetService:
 PolicyDependency = Annotated[BatchGenerationPolicyService, Depends(get_policy_service)]
 AssetDependency = Annotated[AssetService, Depends(get_asset_service)]
 AdminDependency = Annotated[AuthenticatedPrincipal, Depends(require_admin)]
+CustomerDependency = Annotated[AuthenticatedPrincipal, Depends(require_customer)]
 DatabaseDependency = Annotated[AsyncSession, Depends(get_db)]
 OptionalBatchPolicyBody = Annotated[BatchPolicyPayload | None, Body()]
 
@@ -62,6 +63,32 @@ async def upload_reference_image(
     if media_type is None:
         raise HTTPException(status_code=422, detail="Reference image must be JPEG, PNG, or WebP")
     record = await assets.create_reference_image(
+        session,
+        content=content,
+        media_type=media_type,
+        original_filename=_safe_filename(file.filename),
+        actor_id=principal.id,
+        trace_id=uuid4().hex,
+    )
+    return success_response(data=_asset_dto(record), code=201)
+
+
+@router.post("/model-strategy-assets/showcase-images", status_code=status.HTTP_201_CREATED)
+async def upload_showcase_image(
+    file: UploadFile,
+    principal: AdminDependency,
+    session: DatabaseDependency,
+    assets: AssetDependency,
+) -> APIResponse:
+    """Store an admin preview image that never participates in model generation."""
+
+    content = await file.read()
+    if not content or len(content) > _MAX_REFERENCE_IMAGE_BYTES:
+        raise HTTPException(status_code=422, detail="Showcase image is invalid")
+    media_type = _detect_reference_image_media_type(content)
+    if media_type is None:
+        raise HTTPException(status_code=422, detail="Showcase image must be JPEG, PNG, or WebP")
+    record = await assets.create_batch_style_showcase(
         session,
         content=content,
         media_type=media_type,
@@ -98,6 +125,63 @@ async def read_reference_image_content(
         record, content = await assets.read_reference_image(session, asset_id)
     except LookupError as error:
         raise HTTPException(status_code=404, detail="Reference image not found") from error
+    return Response(
+        content=content,
+        media_type=record.media_type,
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.get("/model-strategy-assets/showcase-images/{asset_id}/content")
+async def read_showcase_image_content(
+    asset_id: str,
+    _: AdminDependency,
+    session: DatabaseDependency,
+    assets: AssetDependency,
+) -> Response:
+    """Return protected admin preview bytes for a style showcase draft."""
+
+    try:
+        record, content = await assets.read_batch_style_showcase(session, asset_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Showcase image not found") from error
+    return Response(
+        content=content,
+        media_type=record.media_type,
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.get("/generation-style-catalog")
+async def get_generation_style_catalog(
+    _: CustomerDependency, session: DatabaseDependency, service: PolicyDependency
+) -> APIResponse:
+    """Return only the active customer's safe, published style preview catalog."""
+
+    catalog = await service.get_customer_style_catalog(session)
+    return success_response(data=catalog.model_dump(mode="json"))
+
+
+@router.get(
+    "/generation-style-catalog/styles/{style_id}/showcase-images/{asset_id}/content",
+    response_model=None,
+)
+async def read_generation_style_showcase_content(
+    style_id: str,
+    asset_id: str,
+    _: CustomerDependency,
+    session: DatabaseDependency,
+    service: PolicyDependency,
+    assets: AssetDependency,
+) -> Response:
+    """Serve one catalog image only when it remains in the published customer catalog."""
+
+    if not await service.has_customer_showcase_image(session, style_id, asset_id):
+        raise HTTPException(status_code=404, detail="Style showcase image not found")
+    try:
+        record, content = await assets.read_batch_style_showcase(session, asset_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Style showcase image not found") from error
     return Response(
         content=content,
         media_type=record.media_type,

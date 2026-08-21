@@ -19,8 +19,12 @@ from src.models.batch_generation_policy import (
     BatchPolicyPayload,
     BatchPolicyVersionDto,
     BatchStyleDto,
+    GenerationStyleCatalogDto,
+    GenerationStyleCatalogStyleDto,
+    GenerationStyleShowcaseImageDto,
     StrategyValidationErrorDto,
 )
+from src.services.asset_service import BATCH_STYLE_SHOWCASE_PURPOSE
 from src.services.batch_prompt_compiler import (
     BatchCompileContext,
     BatchTemplateCombination,
@@ -39,6 +43,15 @@ class BatchPolicyValidationError(RuntimeError):
         super().__init__(error_code)
         self.validation_errors = validation_errors
         self.error_code = error_code
+
+
+class BatchStyleSelectionError(RuntimeError):
+    """A customer-safe rejection for a stale or malformed style selection."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
 
 
 class BatchGenerationPolicyService:
@@ -119,6 +132,7 @@ class BatchGenerationPolicyService:
 
         context = await self._compile_context(session, policy)
         validation_errors = validate_batch_policy(policy, context)
+        validation_errors.extend(await self._validate_showcase_assets(session, policy))
         if validation_errors:
             raise BatchPolicyValidationError(
                 validation_errors=validation_errors,
@@ -194,8 +208,8 @@ class BatchGenerationPolicyService:
             return None
 
     async def allocate_rotation_combinations(
-        self, session: AsyncSession, version_id: str
-    ) -> list[BatchTemplateCombination]:
+        self, session: AsyncSession, version_id: str, selected_style_ids: list[str] | None = None
+    ) -> tuple[list[BatchTemplateCombination], dict[str, int]]:
         """Advance only each style's own cursor while retaining template/reference pairs."""
 
         record = await session.get(BatchGenerationPolicyVersion, version_id)
@@ -212,9 +226,10 @@ class BatchGenerationPolicyService:
             ).all()
         )
         cursors = {item.style_id: item.next_template_offset for item in cursor_records}
+        allocation = await self._style_allocation(session, styles, selected_style_ids or [])
         combinations: list[BatchTemplateCombination]
         next_cursors: dict[str, int]
-        combinations, next_cursors = rotate_complete_template_combinations(styles, cursors)
+        combinations, next_cursors = rotate_complete_template_combinations(styles, cursors, allocation)
         now = datetime.now(UTC)
         rows_by_style = {item.style_id: item for item in cursor_records}
         for style_id, offset in next_cursors.items():
@@ -232,7 +247,31 @@ class BatchGenerationPolicyService:
                 row.next_template_offset = offset
                 row.updated_at = now
         await session.flush()
-        return combinations
+        return combinations, allocation
+
+    async def get_customer_style_catalog(
+        self, session: AsyncSession
+    ) -> GenerationStyleCatalogDto:
+        """Return only complete, published customer-facing style metadata."""
+
+        record = await self._active_version(session)
+        if record is None:
+            return GenerationStyleCatalogDto(policy_version_id="", styles=[])
+        styles = self._styles_snapshot(record)
+        catalog_styles = await self._catalog_styles(session, styles)
+        return GenerationStyleCatalogDto(policy_version_id=record.id, styles=catalog_styles)
+
+    async def has_customer_showcase_image(
+        self, session: AsyncSession, style_id: str, asset_id: str
+    ) -> bool:
+        """Check active catalog membership before serving protected preview bytes."""
+
+        catalog = await self.get_customer_style_catalog(session)
+        return any(
+            style.id == style_id
+            and any(image.asset_id == asset_id for image in style.showcase_images)
+            for style in catalog.styles
+        )
 
     async def allocate_replenishment_combination(
         self, session: AsyncSession, version_id: str, style_id: str
@@ -336,6 +375,154 @@ class BatchGenerationPolicyService:
             published_at=record.published_at,
         )
 
+    async def _style_allocation(
+        self,
+        session: AsyncSession,
+        styles: list[BatchStyleDto],
+        selected_style_ids: list[str],
+    ) -> dict[str, int]:
+        """Allocate default counts or selected-style quotas with stable largest remainder."""
+
+        enabled = [style for style in styles if style.generation_count > 0 and _has_complete_template(style)]
+        if not selected_style_ids:
+            return {style.id: style.generation_count for style in enabled}
+        if len(set(selected_style_ids)) != len(selected_style_ids):
+            raise BatchStyleSelectionError("duplicate_selected_style", "风格选择不能重复")
+        total_count = sum(style.generation_count for style in enabled)
+        if len(selected_style_ids) > total_count:
+            raise BatchStyleSelectionError(
+                "selected_style_count_exceeds_target", "选择的风格数量不能超过本批生成数量"
+            )
+        catalog_ids = {style.id for style in await self._catalog_styles(session, styles)}
+        by_id = {style.id: style for style in enabled}
+        invalid = [style_id for style_id in selected_style_ids if style_id not in catalog_ids or style_id not in by_id]
+        if invalid:
+            raise BatchStyleSelectionError("selected_style_unavailable", "所选风格已失效，请刷新后重试")
+        selected = [style for style in enabled if style.id in set(selected_style_ids)]
+        remaining = total_count - len(selected)
+        weight_total = sum(style.generation_count for style in selected)
+        floor_counts: dict[str, int] = {}
+        remainders: list[tuple[int, int, str]] = []
+        for order, style in enumerate(selected):
+            numerator = remaining * style.generation_count
+            floor_counts[style.id] = numerator // weight_total
+            remainders.append((numerator % weight_total, order, style.id))
+        extra = remaining - sum(floor_counts.values())
+        for _, _, style_id in sorted(remainders, key=lambda item: (-item[0], item[1]))[:extra]:
+            floor_counts[style_id] += 1
+        return {style.id: 1 + floor_counts[style.id] for style in selected}
+
+    async def _catalog_styles(
+        self, session: AsyncSession, styles: list[BatchStyleDto]
+    ) -> list[GenerationStyleCatalogStyleDto]:
+        """Filter immutable snapshots into customer-safe styles without template leakage."""
+
+        all_ids = [asset_id for style in styles for asset_id in style.showcase_image_asset_ids]
+        records: dict[str, AssetRecord] = {}
+        if all_ids:
+            rows = list(
+                (
+                    await session.scalars(
+                        select(AssetRecord).where(
+                            AssetRecord.asset_id.in_(set(all_ids)),
+                            AssetRecord.purpose == BATCH_STYLE_SHOWCASE_PURPOSE,
+                        )
+                    )
+                ).all()
+            )
+            records = {row.asset_id: row for row in rows}
+        catalog: list[GenerationStyleCatalogStyleDto] = []
+        for style in styles:
+            asset_ids = style.showcase_image_asset_ids
+            if (
+                style.generation_count <= 0
+                or not style.description.strip()
+                or not 1 <= len(asset_ids) <= 3
+                or len(set(asset_ids)) != len(asset_ids)
+                or any(asset_id not in records for asset_id in asset_ids)
+                or not _has_complete_template(style)
+            ):
+                continue
+            catalog.append(
+                GenerationStyleCatalogStyleDto(
+                    id=style.id,
+                    name=style.name,
+                    description=style.description,
+                    showcase_images=[
+                        GenerationStyleShowcaseImageDto(
+                            asset_id=asset_id,
+                            content_url=(
+                                f"/api/v1/generation-style-catalog/styles/{style.id}"
+                                f"/showcase-images/{asset_id}/content"
+                            ),
+                            filename=(records[asset_id].original_filename or "").strip(),
+                        )
+                        for asset_id in asset_ids
+                    ],
+                )
+            )
+        return catalog
+
+    async def _validate_showcase_assets(
+        self, session: AsyncSession, policy: BatchPolicyPayload
+    ) -> list[StrategyValidationErrorDto]:
+        """Validate preview metadata separately from provider template references."""
+
+        referenced_ids = {
+            asset_id for style in policy.styles for asset_id in style.showcase_image_asset_ids
+        }
+        records: set[str] = set()
+        if referenced_ids:
+            records = set(
+                (
+                    await session.scalars(
+                        select(AssetRecord.asset_id).where(
+                            AssetRecord.asset_id.in_(referenced_ids),
+                            AssetRecord.purpose == BATCH_STYLE_SHOWCASE_PURPOSE,
+                        )
+                    )
+                ).all()
+            )
+        errors: list[StrategyValidationErrorDto] = []
+        for index, style in enumerate(policy.styles):
+            if style.generation_count <= 0:
+                continue
+            prefix = f"styles[{index}]"
+            if not style.description.strip():
+                errors.append(
+                    StrategyValidationErrorDto(
+                        field=f"{prefix}.description", code="required", message="请填写客户简介"
+                    )
+                )
+            image_ids = style.showcase_image_asset_ids
+            if not 1 <= len(image_ids) <= 3:
+                errors.append(
+                    StrategyValidationErrorDto(
+                        field=f"{prefix}.showcase_image_asset_ids",
+                        code="invalid_showcase_image",
+                        message="请上传 1 至 3 张客户展示样图",
+                    )
+                )
+            elif len(set(image_ids)) != len(image_ids):
+                errors.append(
+                    StrategyValidationErrorDto(
+                        field=f"{prefix}.showcase_image_asset_ids",
+                        code="invalid_showcase_image",
+                        message="客户展示样图不能重复",
+                    )
+                )
+            else:
+                for image_index, asset_id in enumerate(image_ids):
+                    if asset_id not in records:
+                        errors.append(
+                            StrategyValidationErrorDto(
+                                field=f"{prefix}.showcase_image_asset_ids[{image_index}]",
+                                code="invalid_showcase_image",
+                                message="客户展示样图无效，请重新上传",
+                            )
+                        )
+        return errors
+
 
 def _has_verified_image_to_image(connection: ModelConnection | None) -> bool:
     """Read only the verified capability flag stored by the controlled connection test."""
@@ -366,6 +553,8 @@ def _migrate_legacy_style_snapshot(value: object) -> object:
     if not isinstance(value, dict):
         return value
     style = dict(value)
+    style.setdefault("description", "")
+    style.setdefault("showcase_image_asset_ids", [])
     templates = style.get("templates")
     if not isinstance(templates, list):
         return style
@@ -381,3 +570,20 @@ def _migrate_legacy_style_snapshot(value: object) -> object:
         normalized_templates.append(normalized)
     style["templates"] = normalized_templates
     return style
+
+
+def _has_complete_template(style: BatchStyleDto) -> bool:
+    """Keep catalog and selection eligibility aligned with runtime rotation."""
+
+    return any(
+        template.name.strip()
+        and template.positive_prompt.strip()
+        and _template_variable_names(template.positive_prompt).count("域名") == 1
+        and _template_variable_names(template.positive_prompt).count("用户参考要求") <= 1
+        and all(
+            variable in {"域名", "用户参考要求"}
+            for variable in _template_variable_names(template.positive_prompt)
+            + _template_variable_names(template.negative_prompt or "")
+        )
+        for template in style.templates
+    )

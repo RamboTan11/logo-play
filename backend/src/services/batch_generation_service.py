@@ -37,7 +37,10 @@ from src.services.asset_service import (
     LocalFallbackAssetStorage,
     is_valid_source_image,
 )
-from src.services.batch_generation_policy_service import BatchGenerationPolicyService
+from src.services.batch_generation_policy_service import (
+    BatchGenerationPolicyService,
+    BatchStyleSelectionError,
+)
 from src.services.batch_prompt_compiler import (
     REPLENISHMENT_BUDGET,
     BatchCompileContext,
@@ -129,6 +132,7 @@ class BatchGenerationService:
         domain_suffix: DomainSuffix,
         source_image_asset_id: str | None = None,
         user_reference_requirement: str | None = None,
+        selected_style_ids: list[str] | None = None,
     ) -> BatchGenerationAcceptedDto:
         """Create all initial jobs and snapshots without invoking the provider."""
 
@@ -173,9 +177,15 @@ class BatchGenerationService:
                 assets={**context.assets, source_asset.asset_id: source_asset},
                 max_input_images=context.max_input_images,
             )
-        combinations = await BatchGenerationPolicyService().allocate_rotation_combinations(
-            session, policy_version.id
-        )
+        selected_ids = list(selected_style_ids or [])
+        try:
+            combinations, style_allocation = (
+                await BatchGenerationPolicyService().allocate_rotation_combinations(
+                    session, policy_version.id, selected_ids
+                )
+            )
+        except BatchStyleSelectionError as error:
+            raise BatchGenerationRequestError(error.code, error.message, 422) from error
         if not combinations:
             raise BatchGenerationRequestError(
                 "no_generation_target", "当前批量生图策略没有可生成的图片", 409
@@ -202,6 +212,10 @@ class BatchGenerationService:
             user_reference_requirement_normalized=normalize_reference_requirement(raw_requirement),
             generation_mode=(
                 "reference_guided_generation" if source_asset is not None else "text_generation"
+            ),
+            selected_style_ids_json=json.dumps(selected_ids, ensure_ascii=True, separators=(",", ":")),
+            style_allocation_json=json.dumps(
+                style_allocation, ensure_ascii=True, separators=(",", ":"), sort_keys=True
             ),
             policy_version_id=policy_version.id,
             model_connection_id=policy_version.model_connection_id,
@@ -237,6 +251,8 @@ class BatchGenerationService:
                 "model_connection_version": policy_version.model_connection_version,
                 "target_count": request.target_count,
                 "created_candidate_jobs": len(combinations),
+                "selected_style_ids": selected_ids,
+                "style_allocation": style_allocation,
             },
         )
         await session.flush()
@@ -1066,6 +1082,8 @@ class BatchGenerationService:
         )
         snapshot = {
             "policy_version_id": request.policy_version_id,
+            "selected_style_ids": _safe_string_list(request.selected_style_ids_json),
+            "style_allocation": _safe_snapshot(request.style_allocation_json),
             "model_connection_id": request.model_connection_id,
             "model_connection_version": request.model_connection_version,
             "style": {"id": style.id, "name": style.name},
@@ -1357,6 +1375,14 @@ def _safe_snapshot(value: str) -> dict[str, object]:
     except (TypeError, ValueError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _safe_string_list(value: str) -> list[str]:
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return [item for item in parsed if isinstance(item, str)] if isinstance(parsed, list) else []
 
 
 def _safe_summary(value: str) -> dict[str, object]:

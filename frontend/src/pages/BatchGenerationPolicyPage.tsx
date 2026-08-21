@@ -9,6 +9,7 @@ import {
   getReferenceImageAssets,
   publishBatchGenerationPolicy,
   saveBatchGenerationPolicyDraft,
+  uploadShowcaseImage,
   uploadReferenceImage,
 } from '../services/batchGenerationPolicyService'
 import { getModelConnections } from '../services/modelConnectionsService'
@@ -22,7 +23,6 @@ import type {
 } from '../types/modelStrategy'
 import {
   applyBatchGenerationCountGates,
-  BATCH_GENERATION_COUNT_OPTIONS,
   canSelectBatchGenerationCount,
   isCompleteBatchTemplate,
   visibleBatchTemplates,
@@ -31,6 +31,16 @@ import {
 interface StyleFormState {
   id: string | null
   name: string
+  description: string
+  showcaseImages: ShowcaseImageDraft[]
+}
+
+interface ShowcaseImageDraft {
+  key: string
+  assetId?: string
+  file?: File
+  previewUrl?: string
+  filename: string
 }
 
 interface TemplateFormState {
@@ -56,6 +66,10 @@ type DraftSaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 function nextDraftId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function showcaseAssetContentUrl(assetId: string): string {
+  return `${import.meta.env.BASE_URL}api/v1/model-strategy-assets/showcase-images/${encodeURIComponent(assetId)}/content`
 }
 
 async function referenceImageContentHash(file: File): Promise<string> {
@@ -241,18 +255,101 @@ export function BatchGenerationPolicyPage() {
     discardTemplateForm()
   }
 
-  const applyStyleForm = async () => {
-    const currentDraft = draftRef.current
-    if (!currentDraft || !styleForm) return
-    const duplicate = styleForm.name.trim() && currentDraft.styles.some((style) => style.id !== styleForm.id && style.name.trim() === styleForm.name.trim())
-    if (duplicate) { setModalError('已存在同名风格类型。'); return }
-    const styles = styleForm.id
-      ? currentDraft.styles.map((style) => style.id === styleForm.id ? { ...style, name: styleForm.name } : style)
-      : [...currentDraft.styles, { id: nextDraftId('draft-style'), name: styleForm.name, generation_count: 0, templates: [] }]
-    const saved = await persistDraft({ ...currentDraft, styles }, false)
-    if (!saved) { setModalError('草稿保存失败，请重试。'); return }
+  const closeStyleForm = () => {
+    styleForm?.showcaseImages.forEach((image) => {
+      if (image.previewUrl) URL.revokeObjectURL(image.previewUrl)
+    })
     setStyleForm(null)
     setModalError('')
+  }
+
+  const openStyleForm = (style?: BatchPolicyPayloadDto['styles'][number]) => {
+    const form: StyleFormState = {
+      id: style?.id ?? null,
+      name: style?.name ?? '',
+      description: style?.description ?? '',
+    showcaseImages: (style?.showcase_image_asset_ids ?? []).map((assetId) => ({
+      key: assetId,
+      assetId,
+      previewUrl: showcaseAssetContentUrl(assetId),
+      filename: '展示样图',
+    })),
+    }
+    setStyleForm(form)
+    setModalError('')
+  }
+
+  const chooseShowcaseImages = (files: File[]) => {
+    if (!styleForm || !files.length || isUploading) return
+    const remaining = 3 - styleForm.showcaseImages.length
+    if (remaining <= 0) {
+      showToast('最多支持 3 张展示样图，请先删除后再添加。')
+      return
+    }
+    const valid = files.filter((file) => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 12 * 1024 * 1024)
+    if (valid.length !== files.length) showToast('仅支持 12MB 以内的 JPEG、PNG 或 WebP 图片。')
+    const additions = valid.slice(0, remaining).map((file) => ({
+      key: nextDraftId('pending-showcase'),
+      file,
+      previewUrl: URL.createObjectURL(file),
+      filename: file.name,
+    }))
+    if (!additions.length) return
+    setStyleForm((current) => current ? {
+      ...current,
+      showcaseImages: [...current.showcaseImages, ...additions],
+    } : current)
+    if (valid.length > remaining) showToast(`最多添加 3 张展示样图，已保留前 ${remaining} 张。`)
+  }
+
+  const removeShowcaseImage = (key: string) => {
+    setStyleForm((current) => {
+      if (!current) return current
+      const image = current.showcaseImages.find((item) => item.key === key)
+      if (image?.previewUrl) URL.revokeObjectURL(image.previewUrl)
+      return { ...current, showcaseImages: current.showcaseImages.filter((item) => item.key !== key) }
+    })
+  }
+
+  const applyStyleForm = async () => {
+    const currentDraft = draftRef.current
+    if (!currentDraft || !styleForm || isUploading) return
+    const duplicate = styleForm.name.trim() && currentDraft.styles.some((style) => style.id !== styleForm.id && style.name.trim() === styleForm.name.trim())
+    if (duplicate) { setModalError('已存在同名风格类型。'); return }
+    setIsUploading(true)
+    let uploaded: ReferenceImageAssetDto[] = []
+    try {
+      uploaded = await Promise.all(styleForm.showcaseImages.flatMap((image) => image.file ? [uploadShowcaseImage(image.file)] : []))
+    } catch (error) {
+      setIsUploading(false)
+      setModalError(error instanceof Error ? error.message : '上传展示样图失败')
+      return
+    }
+    let uploadIndex = 0
+    const showcaseImageAssetIds = styleForm.showcaseImages.flatMap((image) => {
+      if (image.assetId) return [image.assetId]
+      const asset = uploaded[uploadIndex++]
+      return asset ? [asset.id] : []
+    })
+    const styles = styleForm.id
+      ? currentDraft.styles.map((style) => style.id === styleForm.id ? {
+        ...style,
+        name: styleForm.name,
+        description: styleForm.description,
+        showcase_image_asset_ids: showcaseImageAssetIds,
+      } : style)
+      : [...currentDraft.styles, {
+        id: nextDraftId('draft-style'),
+        name: styleForm.name,
+        description: styleForm.description,
+        showcase_image_asset_ids: showcaseImageAssetIds,
+        generation_count: 0,
+        templates: [],
+      }]
+    const saved = await persistDraft({ ...currentDraft, styles }, false)
+    setIsUploading(false)
+    if (!saved) { setModalError('草稿保存失败，请重试。'); return }
+    closeStyleForm()
   }
 
   const openTemplateForm = (styleId: string, template?: BatchPromptTemplateDto) => {
@@ -475,7 +572,7 @@ export function BatchGenerationPolicyPage() {
           <header className="strategy-section-title batch-editor-title">
             <div><h2>风格与模板</h2><p>{draft.styles.length} 个风格 · 本轮合计生成 {totalGenerationCount} 张图片（最多 9 张）</p></div>
             <div className="batch-editor-actions">
-              <button className="internal-button strategy-button-with-icon" type="button" onClick={() => { setStyleForm({ id: null, name: '' }); setModalError('') }}><Plus size={15} />新增风格</button>
+              <button className="internal-button strategy-button-with-icon" type="button" onClick={() => openStyleForm()}><Plus size={15} />新增风格</button>
               <button className="internal-button primary strategy-button-with-icon" type="button" disabled={isPublishing || draftSaveState === 'saving'} onClick={() => void publish()}>{isPublishing ? <LoaderCircle className="strategy-spin" size={16} /> : <Send size={16} />}{isPublishing ? '正在发布...' : '发布策略'}</button>
             </div>
           </header>
@@ -488,16 +585,24 @@ export function BatchGenerationPolicyPage() {
               return <article key={style.id} className={`batch-style-row${styleHasError ? ' has-error' : ''}`}>
                 <header className="batch-style-head">
                   <div className="batch-style-identity"><span>风格 {String(styleIndex + 1).padStart(2, '0')}</span><b>{style.name.trim() || '未命名风格'}</b><small>{completeCount} / {style.templates.length} 个完整模板</small></div>
-                  <div className="batch-count-field"><span>生成数</span><div className="batch-count-options" role="group" aria-label={`${style.name || '未命名风格'}生成数`}>
-                    {BATCH_GENERATION_COUNT_OPTIONS.map((count) => {
-                      const isSelected = style.generation_count === count
-                      const nextCount = isSelected ? 0 : count
-                      const exceedsTotal = !canSelectBatchGenerationCount(draft, style.id, nextCount)
-                      return <button key={count} type="button" aria-pressed={isSelected} className={isSelected ? 'active' : ''} title={exceedsTotal ? '所有风格本轮合计最多生成 9 张图片' : isSelected ? '再次点击取消选择' : `${count} 张`} disabled={completeCount === 0 || draftSaveState === 'saving' || exceedsTotal} onClick={() => void updateGenerationCount(style.id, nextCount)}>{count}</button>
-                    })}
-                  </div></div>
+                  <label className="batch-count-field"><span>生成数</span><input
+                    className="batch-count-input"
+                    aria-label={`${style.name || '未命名风格'}生成数`}
+                    type="number"
+                    min={0}
+                    max={9}
+                    step={1}
+                    inputMode="numeric"
+                    value={style.generation_count}
+                    title="输入 0 至 9 的整数；所有风格合计最多生成 9 张图片"
+                    disabled={completeCount === 0 || draftSaveState === 'saving'}
+                    onChange={(event) => {
+                      const nextCount = Number(event.target.value)
+                      if (Number.isInteger(nextCount)) void updateGenerationCount(style.id, nextCount)
+                    }}
+                  /></label>
                   <div className="strategy-row-actions">
-                    <button className="strategy-icon-button" type="button" title="编辑风格" aria-label={`编辑风格 ${style.name || '未命名'}`} onClick={() => { setStyleForm({ id: style.id, name: style.name }); setModalError('') }}><Pencil size={16} /></button>
+                    <button className="strategy-icon-button" type="button" title="编辑风格" aria-label={`编辑风格 ${style.name || '未命名'}`} onClick={() => openStyleForm(style)}><Pencil size={16} /></button>
                     <button className="strategy-icon-button danger" type="button" title="删除风格" aria-label={`删除风格 ${style.name || '未命名'}`} onClick={() => deleteStyle(style.id)}><Trash2 size={16} /></button>
                   </div>
                 </header>
@@ -532,9 +637,23 @@ export function BatchGenerationPolicyPage() {
       {styleForm && <StrategyDialog
         title={styleForm.id ? '编辑风格类型' : '新增风格类型'}
         description="完成后即保存到策略草稿；发布前不会影响正在使用的策略。"
-        onClose={() => { if (draftSaveState !== 'saving') setStyleForm(null) }}
-        footer={<><button className="internal-button" type="button" disabled={draftSaveState === 'saving'} onClick={() => setStyleForm(null)}>取消</button><button className="internal-button primary" type="button" disabled={draftSaveState === 'saving'} onClick={() => void applyStyleForm()}>{draftSaveState === 'saving' ? '正在保存...' : '完成'}</button></>}
-      ><div className="strategy-form single-column"><label><span>风格名称 <b>*</b></span><input autoFocus value={styleForm.name} onChange={(event) => setStyleForm({ ...styleForm, name: event.target.value })} placeholder="如：极简科技" maxLength={32} /></label>{modalError && <p className="strategy-form-error">{modalError}</p>}</div></StrategyDialog>}
+        onClose={() => { if (draftSaveState !== 'saving' && !isUploading) closeStyleForm() }}
+        footer={<><button className="internal-button" type="button" disabled={draftSaveState === 'saving' || isUploading} onClick={closeStyleForm}>取消</button><button className="internal-button primary" type="button" disabled={draftSaveState === 'saving' || isUploading} onClick={() => void applyStyleForm()}>{isUploading || draftSaveState === 'saving' ? '正在保存...' : '完成'}</button></>}
+      ><div className="strategy-form single-column">
+        <label><span>风格名称 <b>*</b></span><input autoFocus value={styleForm.name} onChange={(event) => setStyleForm({ ...styleForm, name: event.target.value })} placeholder="如：极简科技" maxLength={32} /></label>
+        <label><span>客户简介</span><textarea value={styleForm.description} onChange={(event) => setStyleForm({ ...styleForm, description: event.target.value })} placeholder="用于前台向客户介绍该风格" maxLength={280} /></label>
+        <div className="style-showcase-editor">
+          <span>展示样图 <small>请上传 1～3 张风格类型样图，该图片不参与模型生图</small></span>
+          <div className="style-showcase-list">
+            {styleForm.showcaseImages.map((image) => <div className="style-showcase-item" key={image.key}>
+              {image.previewUrl ? <img src={image.previewUrl} alt={image.filename} /> : <div className="style-showcase-placeholder"><FileImage size={18} /></div>}
+              <button className="strategy-icon-button danger" type="button" title="删除展示样图" aria-label="删除展示样图" onClick={() => removeShowcaseImage(image.key)} disabled={isUploading}><X size={14} /></button>
+            </div>)}
+            {styleForm.showcaseImages.length < 3 && <label className="style-showcase-add" title="上传展示样图"><ImagePlus size={18} /><span>上传</span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isUploading} onChange={(event) => { chooseShowcaseImages(Array.from(event.target.files ?? [])); event.currentTarget.value = '' }} /></label>}
+          </div>
+        </div>
+        {modalError && <p className="strategy-form-error">{modalError}</p>}
+      </div></StrategyDialog>}
 
       {templateForm && <StrategyDialog
         wide

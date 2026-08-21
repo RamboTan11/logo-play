@@ -17,6 +17,7 @@ from src.db.session import resolve_backend_path
 from src.services.event_service import EventService
 
 REFERENCE_IMAGE_PURPOSE = "model_strategy_reference"
+BATCH_STYLE_SHOWCASE_PURPOSE = "batch_style_showcase"
 CUSTOMER_GENERATION_SOURCE_PURPOSE = "customer_generation_source"
 GENERATED_LOGO_PURPOSE = "generated_logo"
 TASK_DELIVERY_IMAGE_PURPOSE = "task_delivery_image"
@@ -187,6 +188,41 @@ class AssetService:
         )
         return record
 
+    async def create_batch_style_showcase(
+        self,
+        session: AsyncSession,
+        *,
+        content: bytes,
+        media_type: str,
+        actor_id: str,
+        trace_id: str,
+        original_filename: str | None = None,
+    ) -> AssetRecord:
+        """Persist an admin-owned image used only for customer style previews."""
+
+        stored = self._storage.write(content, media_type)
+        record = AssetRecord(
+            asset_id=stored.asset_id,
+            purpose=BATCH_STYLE_SHOWCASE_PURPOSE,
+            storage_backend=LOCAL_FALLBACK,
+            storage_key=stored.storage_key,
+            content_hash=stored.content_hash,
+            media_type=media_type,
+            size=len(content),
+            original_filename=original_filename,
+        )
+        session.add(record)
+        await self._events.record_audit(
+            session,
+            action="batch_style_showcase.created",
+            resource_type="asset",
+            resource_id=record.asset_id,
+            actor_id=actor_id,
+            trace_id=trace_id,
+            summary={"purpose": BATCH_STYLE_SHOWCASE_PURPOSE, "storage_backend": LOCAL_FALLBACK},
+        )
+        return record
+
     async def create_customer_generation_source(
         self,
         session: AsyncSession,
@@ -332,6 +368,19 @@ class AssetService:
             return record, self._storage.read(record.storage_key)
         except OSError as error:
             raise LookupError("Reference image not found") from error
+
+    async def read_batch_style_showcase(
+        self, session: AsyncSession, asset_id: str
+    ) -> tuple[AssetRecord, bytes]:
+        """Read a customer preview image after the route verified catalog membership."""
+
+        record = await session.get(AssetRecord, asset_id)
+        if record is None or record.purpose != BATCH_STYLE_SHOWCASE_PURPOSE:
+            raise LookupError("Style showcase image not found")
+        try:
+            return record, self._storage.read(record.storage_key)
+        except OSError as error:
+            raise LookupError("Style showcase image not found") from error
 
     async def read_customer_generation_source(
         self, session: AsyncSession, asset_id: str, customer_id: str

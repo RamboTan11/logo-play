@@ -398,6 +398,12 @@ class GenerationRequest(Base):
     generation_mode: Mapped[str] = mapped_column(
         String(32), default="text_generation", server_default=text("'text_generation'"), nullable=False
     )
+    selected_style_ids_json: Mapped[str] = mapped_column(
+        Text, default="[]", server_default=text("'[]'"), nullable=False
+    )
+    style_allocation_json: Mapped[str] = mapped_column(
+        Text, default="{}", server_default=text("'{}'"), nullable=False
+    )
     policy_version_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("batch_generation_policy_versions.id", ondelete="RESTRICT"),

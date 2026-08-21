@@ -124,6 +124,7 @@ async def create_batch_generation(
             payload.domain_suffix,
             payload.source_image_asset_id,
             payload.user_reference_requirement,
+            payload.selected_style_ids,
         )
     except BatchGenerationRequestError as error:
         return _request_error_response(error)

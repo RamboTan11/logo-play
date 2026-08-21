@@ -1,7 +1,7 @@
 import type { BatchPolicyPayloadDto, BatchPromptTemplateDto } from '../types/modelStrategy'
 
 const templateVariablePattern = /{{\s*([^{}]+?)\s*}}/g
-export const BATCH_GENERATION_COUNT_OPTIONS = [3, 6, 9] as const
+export const MIN_BATCH_GENERATION_COUNT = 0
 export const MAX_TOTAL_BATCH_GENERATION_COUNT = 9
 
 function variableNames(value: string | null): string[] {
@@ -30,6 +30,9 @@ export function canSelectBatchGenerationCount(
   styleId: string,
   count: number,
 ): boolean {
+  if (!Number.isInteger(count) || count < MIN_BATCH_GENERATION_COUNT || count > MAX_TOTAL_BATCH_GENERATION_COUNT) {
+    return false
+  }
   const total = policy.styles.reduce(
     (sum, style) => sum + (style.id === styleId ? count : style.generation_count),
     0,
@@ -43,7 +46,10 @@ export function applyBatchGenerationCountGates(policy: BatchPolicyPayloadDto): B
     styles: policy.styles.map((style) => ({
       ...style,
       generation_count: style.templates.some(isCompleteBatchTemplate)
-        ? Math.min(MAX_TOTAL_BATCH_GENERATION_COUNT, Math.max(0, Math.floor(style.generation_count)))
+        && Number.isInteger(style.generation_count)
+        && style.generation_count >= MIN_BATCH_GENERATION_COUNT
+        && style.generation_count <= MAX_TOTAL_BATCH_GENERATION_COUNT
+        ? style.generation_count
         : 0,
     })),
   }

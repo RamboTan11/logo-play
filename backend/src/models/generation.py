@@ -18,6 +18,7 @@ class BatchGenerationRequestDto(BaseModel):
     domain_suffix: DomainSuffix
     source_image_asset_id: str | None = Field(default=None, min_length=1, max_length=64)
     user_reference_requirement: str | None = Field(default=None, max_length=2_000)
+    selected_style_ids: list[str] = Field(default_factory=list, max_length=9)
 
     @field_validator("domain_label", mode="before")
     @classmethod

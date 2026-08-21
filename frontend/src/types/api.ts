@@ -54,6 +54,7 @@ export interface BatchGenerationRequest {
   domain_suffix: DomainSuffix
   source_image_asset_id?: string
   user_reference_requirement?: string
+  selected_style_ids?: string[]
 }
 
 export interface GenerationSourceAsset {

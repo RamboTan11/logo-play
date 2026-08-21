@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, LoaderCircle, Plus, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Plus, X } from 'lucide-react'
 import { type ClipboardEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientShell } from '../components/ClientShell'
@@ -21,9 +21,17 @@ import {
   readGenerationSourceRecovery,
   writeGenerationSourceRecovery,
 } from '../utils/generationSourceRecovery'
+import {
+  getGenerationStyleCatalog,
+} from '../services/batchGenerationPolicyService'
+import type { GenerationStyleCatalogStyleDto } from '../types/modelStrategy'
 
 const MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024
 const SOURCE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
+
+function filenameWithoutExtension(filename: string): string {
+  return filename.replace(/\.[^/.]+$/, '')
+}
 
 export function CreationPage() {
   const { t } = useClientLanguage()
@@ -31,6 +39,13 @@ export function CreationPage() {
   const suffixControlRef = useRef<HTMLDivElement>(null)
   const suffixTriggerRef = useRef<HTMLButtonElement>(null)
   const [isSuffixOpen, setIsSuffixOpen] = useState(false)
+  const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([])
+  const [previewedStyleId, setPreviewedStyleId] = useState<string | null>(null)
+  const [previewedShowcaseIndex, setPreviewedShowcaseIndex] = useState(0)
+  const [styleCatalog, setStyleCatalog] = useState<GenerationStyleCatalogStyleDto[]>([])
+  const [styleCatalogError, setStyleCatalogError] = useState<string | null>(null)
+  const [showcaseUrls, setShowcaseUrls] = useState<Record<string, string>>({})
+  const [showcaseLightbox, setShowcaseLightbox] = useState<{ src: string; alt: string } | null>(null)
   const [sourceUploadState, setSourceUploadState] = useState(initialGenerationSourceUploadState)
   const sourceInputRef = useRef<HTMLInputElement>(null)
   const sourceRestorationAttemptedRef = useRef(false)
@@ -81,6 +96,35 @@ export function CreationPage() {
     rememberLastCreationPath('/create')
     restoreActiveGeneration()
   }, [restoreActiveGeneration])
+
+  useEffect(() => {
+    let active = true
+    void getGenerationStyleCatalog().then(async (catalog) => {
+      if (!active) return
+      const styles = catalog.styles
+      setStyleCatalog(styles)
+      setStyleCatalogError(null)
+      setSelectedStyleIds((current) => current.filter((id) => styles.some((style) => style.id === id)))
+      setPreviewedStyleId((current) => current && styles.some((style) => style.id === current)
+        ? current
+        : null)
+      setPreviewedShowcaseIndex(0)
+
+      const resolved = styles.flatMap((style) => style.showcase_images.map((image) => [
+        image.asset_id,
+        image.content_url || `${import.meta.env.BASE_URL}api/v1/generation-style-catalog/styles/${encodeURIComponent(style.id)}/showcase-images/${encodeURIComponent(image.asset_id)}/content`,
+      ] as const))
+      if (active) setShowcaseUrls(Object.fromEntries(resolved))
+    }).catch(() => {
+      if (!active) return
+      setStyleCatalog([])
+      setShowcaseUrls({})
+      setStyleCatalogError('风格目录暂时无法加载，您仍可直接生成。')
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     if (sourceRestorationAttemptedRef.current) return
@@ -138,6 +182,15 @@ export function CreationPage() {
     }
   }, [isSuffixOpen])
 
+  useEffect(() => {
+    if (!showcaseLightbox) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowcaseLightbox(null)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [showcaseLightbox])
+
   const notifyGenerationBusy = () => showToast(t('正在执行生图任务，请稍后。'))
 
   const selectSuffix = (suffix: typeof domainSuffix) => {
@@ -193,6 +246,31 @@ export function CreationPage() {
   }
 
   const hasCompletedResults = completedGeneration !== null
+  const previewedStyle = styleCatalog.find((style) => style.id === previewedStyleId) ?? null
+  const previewedShowcase = previewedStyle?.showcase_images[previewedShowcaseIndex] ?? null
+  const previewedShowcaseFilename = previewedShowcase?.filename?.trim()
+    ? filenameWithoutExtension(previewedShowcase.filename.trim())
+    : ''
+
+  const toggleStyle = (styleId: string) => {
+    const isSelected = selectedStyleIds.includes(styleId)
+    const nextSelectedStyleIds = isSelected
+      ? selectedStyleIds.filter((id) => id !== styleId)
+      : [...selectedStyleIds, styleId]
+    setSelectedStyleIds(nextSelectedStyleIds)
+    setPreviewedStyleId(isSelected
+      ? (previewedStyleId === styleId ? nextSelectedStyleIds[0] ?? null : previewedStyleId)
+      : styleId)
+    setPreviewedShowcaseIndex(0)
+  }
+
+  const changeShowcase = (direction: -1 | 1) => {
+    if (!previewedStyle) return
+    setPreviewedShowcaseIndex((current) => Math.min(
+      previewedStyle.showcase_images.length - 1,
+      Math.max(0, current + direction),
+    ))
+  }
 
   return (
     <ClientShell>
@@ -210,8 +288,12 @@ export function CreationPage() {
         </button>}
         {isProcessing ? <section className="minimal-domain-stage creation-generating-stage" aria-busy="true">
           <GenerationWaitingState title={t('正在生成 Logo 方案')} description={t('正在根据您的域名探索设计方向，生成结果会自动显示')} />
-        </section> : <section className="minimal-domain-stage" aria-live="polite">
-          <label className="sr-only" htmlFor="brand-domain-entry">{t('品牌域名')}</label>
+        </section> : <section className="minimal-domain-stage creation-card" aria-live="polite">
+          <header className="creation-card-intro">
+            <span>{t('从品牌域名开始')}</span>
+            <h2>{t('快速生成您的创意 logo')}</h2>
+          </header>
+          <label className="creation-domain-label" htmlFor="brand-domain-entry"><b>{t('必填')}</b><span>{t('品牌域名')}</span></label>
           <div className="minimal-domain-field">
             <input
               id="brand-domain-entry"
@@ -256,7 +338,61 @@ export function CreationPage() {
               </ul>}
             </div>
           </div>
+          <p className="creation-domain-hint">{t('默认使用您输入域名中的 2～3 个字符设计')}</p>
           {error && <div className="inline-error">{t(error)}</div>}
+          <section className="creation-style-picker" aria-labelledby="creation-style-picker-title">
+            <div className="creation-style-heading">
+              <span>{t('选填')}</span>
+              <h3 id="creation-style-picker-title">{t('猜你喜欢')}</h3>
+            </div>
+            <div className="creation-style-tags" role="group" aria-label={t('选择喜欢的 Logo 类型')}>
+              {styleCatalog.map((style) => <button
+                className={selectedStyleIds.includes(style.id) ? 'active' : ''}
+                type="button"
+                key={style.id}
+                aria-pressed={selectedStyleIds.includes(style.id)}
+                onClick={() => toggleStyle(style.id)}
+              >{t(style.name)}</button>)}
+            </div>
+            {styleCatalogError && <p className="creation-style-catalog-error" role="status">{t(styleCatalogError)}</p>}
+            {previewedStyle && previewedShowcase && <article className="creation-style-preview" aria-live="polite">
+              <div className="creation-style-showcase">
+                <div className="creation-showcase-stage">
+                  {showcaseUrls[previewedShowcase.asset_id]
+                    ? <button
+                      className="creation-showcase-image-button"
+                      type="button"
+                      aria-label={t('放大查看样图')}
+                      title={t('放大查看样图')}
+                      onClick={() => setShowcaseLightbox({ src: showcaseUrls[previewedShowcase.asset_id]!, alt: t(`${previewedStyle.name}样图`) })}
+                    ><img src={showcaseUrls[previewedShowcase.asset_id]} alt={t(`${previewedStyle.name}样图`)} /></button>
+                    : <div className="creation-style-showcase-loading" aria-label={t('正在加载样图')} />}
+                  <button
+                    className="creation-showcase-nav creation-showcase-previous"
+                    type="button"
+                    aria-label={t('上一张样图')}
+                    disabled={previewedShowcaseIndex === 0}
+                    onClick={() => changeShowcase(-1)}
+                  ><ChevronLeft size={18} aria-hidden="true" /></button>
+                  <button
+                    className="creation-showcase-nav creation-showcase-next"
+                    type="button"
+                    aria-label={t('下一张样图')}
+                    disabled={previewedShowcaseIndex === previewedStyle.showcase_images.length - 1}
+                    onClick={() => changeShowcase(1)}
+                  ><ChevronRight size={18} aria-hidden="true" /></button>
+                </div>
+                <div className="creation-showcase-meta">
+                  {previewedShowcaseFilename && <small className="creation-showcase-name" title={previewedShowcaseFilename}>{previewedShowcaseFilename}</small>}
+                  <small className="creation-showcase-count">{previewedShowcaseIndex + 1}/{previewedStyle.showcase_images.length}</small>
+                </div>
+              </div>
+              <div className="creation-style-copy">
+                <strong>{t(previewedStyle.name)}</strong>
+                <p>{t(previewedStyle.description)}</p>
+              </div>
+            </article>}
+          </section>
           <div className="creation-source-control">
             <div className="creation-source-preview-row">
               <div
@@ -276,18 +412,29 @@ export function CreationPage() {
                 {!isUploadingSource && sourceImageAssetId && <button className="creation-source-preview-remove" type="button" title={t('删除视觉参考')} aria-label={t('删除视觉参考')} onClick={removeSourceImage}><X size={14} aria-hidden="true" /></button>}
               </div>
               <div className="creation-source-side">
-                <label className="creation-reference-requirement"><span className="sr-only">{t('创作要求（选填）')}</span><textarea aria-label={t('创作要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。')} readOnly={isRegenerating} onClick={() => { if (isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
+                <label className="creation-reference-requirement"><span className="creation-reference-label">{t('创作要求（选填）')}</span><textarea aria-label={t('创作要求（选填）')} value={userReferenceRequirement} placeholder={t('请输入创作要求，例如：仅使用 mmg 这三个文字进行设计（可留空）。')} readOnly={isRegenerating} onClick={() => { if (isRegenerating) notifyGenerationBusy() }} onChange={(event) => setUserReferenceRequirement(event.target.value)} /></label>
               </div>
             </div>
           </div>
           <footer className="minimal-domain-action">
             <div>
-              <button className="primary" type="button" disabled={!sourceUpload.canGenerate()} onClick={() => { if (isRegenerating) notifyGenerationBusy(); else void generate() }}>{t('生成创意初稿')}</button>
-              <p>{t('本次将生成平面创意初稿，采用后由我们继续优化为最终成品。')}</p>
+              <b>{t('将为您生成创意初稿')}</b>
+              <p>{t('采用后由我们继续优化为最终成品')}</p>
             </div>
+            <button className="primary" type="button" disabled={!sourceUpload.canGenerate()} onClick={() => { if (isRegenerating) notifyGenerationBusy(); else void generate(selectedStyleIds) }}>{t('生成创意初稿')}</button>
           </footer>
         </section>}
       </main>
+      {showcaseLightbox && <div
+        className="strategy-lightbox creation-showcase-lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('样图预览')}
+        onMouseDown={(event) => { if (event.target === event.currentTarget) setShowcaseLightbox(null) }}
+      >
+        <button type="button" className="strategy-lightbox-close" title={t('关闭预览')} aria-label={t('关闭预览')} onClick={() => setShowcaseLightbox(null)}><X size={18} /></button>
+        <img src={showcaseLightbox.src} alt={showcaseLightbox.alt} />
+      </div>}
     </ClientShell>
   )
 }

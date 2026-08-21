@@ -10,6 +10,7 @@ import type {
   PolicyDraftSavedDto,
   PolicyPublishedDto,
   ReferenceImageAssetDto,
+  GenerationStyleCatalogDto,
   SingleImageEditPolicyDataDto,
   SingleImageEditPolicyPayloadDto,
   SingleImageEditPolicyVersionDto,
@@ -57,6 +58,18 @@ export function uploadReferenceImageMock(_: File): Promise<ReferenceImageAssetDt
 }
 
 export function getReferenceImageContentMock(_: string): Promise<Blob> {
+  return unavailable()
+}
+
+export function uploadShowcaseImageMock(_: File): Promise<ReferenceImageAssetDto> {
+  return unavailable()
+}
+
+export function getGenerationStyleCatalogMock(): Promise<GenerationStyleCatalogDto> {
+  return unavailable()
+}
+
+export function getGenerationStyleShowcaseContentMock(_: string, __: string): Promise<Blob> {
   return unavailable()
 }
 

@@ -38,6 +38,7 @@ export function buildBatchGenerationPayload(
   domainSuffix: DomainSuffix,
   sourceImageAssetId?: string | null,
   userReferenceRequirement?: string | null,
+  selectedStyleIds?: string[],
 ): BatchGenerationRequest {
   return {
     domain_label: domainLabel,
@@ -46,6 +47,7 @@ export function buildBatchGenerationPayload(
     ...(userReferenceRequirement?.trim()
       ? { user_reference_requirement: userReferenceRequirement }
       : {}),
+    ...(selectedStyleIds?.length ? { selected_style_ids: selectedStyleIds } : {}),
   }
 }
 
@@ -64,10 +66,11 @@ export async function createBatchGeneration(
   domainSuffix: DomainSuffix,
   sourceImageAssetId?: string | null,
   userReferenceRequirement?: string | null,
+  selectedStyleIds?: string[],
 ): Promise<BatchGenerationData> {
   if (isMockMode) {
     const response = await createBatchGenerationMock(buildBatchGenerationPayload(
-      domainLabel, domainSuffix, sourceImageAssetId, userReferenceRequirement,
+      domainLabel, domainSuffix, sourceImageAssetId, userReferenceRequirement, selectedStyleIds,
     ))
     return response.data
   }
@@ -75,7 +78,7 @@ export async function createBatchGeneration(
     const response = await api.post<ApiResponse<BatchGenerationData>>(
       '/v1/generations/batch',
       buildBatchGenerationPayload(
-        domainLabel, domainSuffix, sourceImageAssetId, userReferenceRequirement,
+        domainLabel, domainSuffix, sourceImageAssetId, userReferenceRequirement, selectedStyleIds,
       ),
     )
     return response.data.data

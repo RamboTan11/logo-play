@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CachedImage } from './CachedImage'
 import { LogoArtwork } from './LogoArtwork'
 import { useClientLanguage } from '../i18n/useClientLanguage'
+import { getSingleEditStatus } from '../services/generationsService'
 
 export interface ResultEditVersion {
   id: string
@@ -16,6 +17,7 @@ interface ResultEditDialogProps {
   onClose: () => void
   onGenerate: (instruction: string) => Promise<ResultEditVersion | null>
   onUse: (version: ResultEditVersion) => void | Promise<void>
+  recoveryRequestId?: string | null
 }
 
 export function ResultEditDialog({
@@ -26,6 +28,7 @@ export function ResultEditDialog({
   onClose,
   onGenerate,
   onUse,
+  recoveryRequestId = null,
 }: ResultEditDialogProps) {
   const { t } = useClientLanguage()
   const [instruction, setInstruction] = useState('')
@@ -33,6 +36,34 @@ export function ResultEditDialog({
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const generateButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!recoveryRequestId) return
+    let active = true
+    const poll = async () => {
+      try {
+        for (;;) {
+          const status = await getSingleEditStatus(recoveryRequestId)
+          if (!active) return
+          if (status.status === 'processing') {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 600))
+            continue
+          }
+          if (status.status === 'succeeded') {
+            const version = status.versions.find((item) => item.id === status.current_version_id)
+            if (version) setGenerated({ id: version.id, imageUrl: version.image_url })
+          } else setError(t('新版本生成失败，请稍后重试。'))
+          setIsGenerating(false)
+          return
+        }
+      } catch {
+        if (active) { setError(t('新版本状态查询失败，请稍后重试。')); setIsGenerating(false) }
+      }
+    }
+    window.setTimeout(() => { if (active) setIsGenerating(true) }, 0)
+    void poll()
+    return () => { active = false }
+  }, [recoveryRequestId, t])
 
   useEffect(() => {
     generateButtonRef.current?.focus()
@@ -59,7 +90,7 @@ export function ResultEditDialog({
     }
   }
 
-  const useGenerated = async () => {
+  const applyGeneratedVersion = async () => {
     if (!generated || isGenerating || isPageBusy) return
     setError(null)
     try {
@@ -103,7 +134,7 @@ export function ResultEditDialog({
         <footer>
           {generated && <button className="secondary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void generate()}>{t('重新生成')}</button>}
           {generated
-            ? <button className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void useGenerated()}>{t('选用')}</button>
+            ? <button className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void applyGeneratedVersion()}>{t('选用')}</button>
             : <button ref={generateButtonRef} className="primary" type="button" disabled={isGenerating || isPageBusy} onClick={() => void generate()}>{t(isGenerating ? '生成中...' : '编辑优化')}</button>}
         </footer>
       </section>

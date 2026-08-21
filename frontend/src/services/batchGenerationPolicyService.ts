@@ -2,11 +2,14 @@ import type { AxiosError } from 'axios'
 import {
   getBatchPolicyMock,
   getBatchPolicyVersionsMock,
+  getGenerationStyleCatalogMock,
+  getGenerationStyleShowcaseContentMock,
   getReferenceImageContentMock,
   getReferenceImageAssetsMock,
   ModelStrategyMockError,
   publishBatchPolicyMock,
   saveBatchPolicyDraftMock,
+  uploadShowcaseImageMock,
   uploadReferenceImageMock,
 } from '@model-strategy-runtime'
 import type { ApiResponse } from '../types/api'
@@ -14,6 +17,7 @@ import type {
   BatchPolicyDataDto,
   BatchPolicyPayloadDto,
   BatchPolicyVersionDto,
+  GenerationStyleCatalogDto,
   PolicyPublishedDto,
   PolicyDraftSavedDto,
   ReferenceImageAssetDto,
@@ -75,6 +79,27 @@ export async function getBatchGenerationPolicyVersions(): Promise<BatchPolicyVer
   }
 }
 
+export async function getGenerationStyleCatalog(): Promise<GenerationStyleCatalogDto> {
+  try {
+    if (useMock) return await getGenerationStyleCatalogMock()
+    return unwrap(await api.get<ApiResponse<GenerationStyleCatalogDto>>('/v1/generation-style-catalog'))
+  } catch (error) {
+    throw normalizeError(error, '读取风格目录失败')
+  }
+}
+
+export async function getGenerationStyleShowcaseContent(styleId: string, assetId: string): Promise<Blob> {
+  try {
+    if (useMock) return await getGenerationStyleShowcaseContentMock(styleId, assetId)
+    return (await api.get<Blob>(
+      `/v1/generation-style-catalog/styles/${encodeURIComponent(styleId)}/showcase-images/${encodeURIComponent(assetId)}/content`,
+      { responseType: 'blob' },
+    )).data
+  } catch (error) {
+    throw normalizeError(error, '读取风格样图失败')
+  }
+}
+
 export async function getReferenceImageAssets(ids: string[]): Promise<ReferenceImageAssetDto[]> {
   const uniqueIds = [...new Set(ids.filter(Boolean))]
   if (!uniqueIds.length) return []
@@ -97,6 +122,34 @@ export async function uploadReferenceImage(file: File): Promise<ReferenceImageAs
     return unwrap(await api.post<ApiResponse<ReferenceImageAssetDto>>('/v1/model-strategy-assets/reference-images', form))
   } catch (error) {
     throw normalizeError(error, '上传参考图失败')
+  }
+}
+
+export async function uploadShowcaseImage(file: File): Promise<ReferenceImageAssetDto> {
+  try {
+    if (useMock) return await uploadShowcaseImageMock(file)
+    const form = new FormData()
+    form.append('file', file)
+    return unwrap(await api.post<ApiResponse<ReferenceImageAssetDto>>('/v1/model-strategy-assets/showcase-images', form))
+  } catch (error) {
+    throw normalizeError(error, '上传展示样图失败')
+  }
+}
+
+export async function getShowcaseImageContent(assetId: string): Promise<Blob> {
+  try {
+    if (useMock) {
+      const catalog = await getGenerationStyleCatalogMock()
+      const style = catalog.styles.find((item) => item.showcase_images.some((image) => image.asset_id === assetId))
+      if (!style) throw new ModelStrategyMockError('展示样图不存在')
+      return await getGenerationStyleShowcaseContentMock(style.id, assetId)
+    }
+    return (await api.get<Blob>(
+      `/v1/model-strategy-assets/showcase-images/${encodeURIComponent(assetId)}/content`,
+      { responseType: 'blob' },
+    )).data
+  } catch (error) {
+    throw normalizeError(error, '读取展示样图失败')
   }
 }
 

@@ -28,6 +28,7 @@ from src.db.migrations import (
     v0021_t030_lark_mention_all,
     v0022_model_connection_retirement,
     v0023_task_feedback_rating,
+    v0024_batch_style_catalog_selection,
 )
 from src.db.models import Customer, SchemaMigration
 from src.db.session import DatabaseRuntime
@@ -57,6 +58,7 @@ MIGRATIONS = (
     v0021_t030_lark_mention_all,
     v0022_model_connection_retirement,
     v0023_task_feedback_rating,
+    v0024_batch_style_catalog_selection,
 )
 
 

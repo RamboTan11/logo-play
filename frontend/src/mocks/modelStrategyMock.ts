@@ -5,6 +5,7 @@ import type {
   BatchPromptTemplateDto,
   CreateModelConnectionRequest,
   ModelConnectionDto,
+  GenerationStyleCatalogDto,
   PolicyPublishedDto,
   ReferenceImageAssetDto,
   SingleImageEditPolicyDataDto,
@@ -132,7 +133,12 @@ export function normalizeBatchGenerationGates(policy: BatchPolicyPayloadDto): Ba
     ...policy,
     styles: policy.styles.map((style) => ({
       ...style,
-      generation_count: style.templates.some(isCompleteBatchTemplate) ? Math.min(9, Math.max(0, Math.floor(style.generation_count))) : 0,
+      generation_count: style.templates.some(isCompleteBatchTemplate)
+        && Number.isInteger(style.generation_count)
+        && style.generation_count >= 0
+        && style.generation_count <= 9
+        ? style.generation_count
+        : 0,
     })),
   }
 }
@@ -148,6 +154,18 @@ export function validateBatchPolicy(policy: BatchPolicyPayloadDto, context: Comp
     })
     if (style.generation_count > 0 && !style.templates.some(isCompleteBatchTemplate)) {
       errors.push({ field: `${stylePrefix}.generation_count`, code: 'required', message: '创建完整模板后才可设置生成数' })
+    }
+    if (style.generation_count > 0 && !style.description.trim()) {
+      errors.push({ field: `${stylePrefix}.description`, code: 'required', message: '请填写客户简介' })
+    }
+    if (style.generation_count > 0 && (style.showcase_image_asset_ids.length < 1 || style.showcase_image_asset_ids.length > 3)) {
+      errors.push({ field: `${stylePrefix}.showcase_image_asset_ids`, code: 'invalid_showcase_image', message: '请上传 1 至 3 张客户展示样图' })
+    }
+    if (new Set(style.showcase_image_asset_ids).size !== style.showcase_image_asset_ids.length || style.showcase_image_asset_ids.some((assetId) => !showcaseImageContents.has(assetId))) {
+      errors.push({ field: `${stylePrefix}.showcase_image_asset_ids`, code: 'invalid_showcase_image', message: '客户展示样图无效，请重新上传' })
+    }
+    if (!Number.isInteger(style.generation_count) || style.generation_count < 0 || style.generation_count > 9) {
+      errors.push({ field: `${stylePrefix}.generation_count`, code: 'invalid_generation_count', message: '生成数仅支持 0 至 9 的整数' })
     }
   })
   const totalGenerationCount = policy.styles.reduce((sum, style) => sum + style.generation_count, 0)
@@ -245,6 +263,10 @@ const referenceImageContents = new Map<string, Blob>([
   ['mock-reference-asset-001', pngBlob(seededReferencePng)],
   ['mock-reference-asset-002', pngBlob(seededReferencePng)],
 ])
+const showcaseImageContents = new Map<string, Blob>([
+  ['mock-showcase-asset-001', pngBlob(seededReferencePng)],
+  ['mock-showcase-asset-002', pngBlob(seededReferencePng)],
+])
 
 let batchVersions: BatchPolicyVersionDto[] = [{
   id: 'mock-batch-policy-v1',
@@ -254,6 +276,8 @@ let batchVersions: BatchPolicyVersionDto[] = [{
     id: 'mock-style-001',
     name: '极简科技',
     generation_count: 3,
+    description: '以克制的几何秩序建立清晰的数字品牌识别。',
+    showcase_image_asset_ids: ['mock-showcase-asset-001'],
     templates: [{
       id: 'mock-template-001',
       name: '几何秩序',
@@ -265,6 +289,8 @@ let batchVersions: BatchPolicyVersionDto[] = [{
     id: 'mock-style-002',
     name: '未来娱乐',
     generation_count: 3,
+    description: '以动感符号和鲜明轮廓表达娱乐品牌的活力。',
+    showcase_image_asset_ids: ['mock-showcase-asset-002'],
     templates: [{
       id: 'mock-template-002',
       name: '动感符号',
@@ -407,6 +433,23 @@ export async function uploadReferenceImageMock(file: File): Promise<ReferenceIma
   return clone(asset)
 }
 
+export async function uploadShowcaseImageMock(file: File): Promise<ReferenceImageAssetDto> {
+  if (!file.type.startsWith('image/')) throw new ModelStrategyMockError('仅支持上传图片文件')
+  assetSequence += 1
+  const contentHash = await fileHash(file)
+  const asset: ReferenceImageAssetDto = {
+    id: `mock-showcase-asset-${String(assetSequence).padStart(3, '0')}`,
+    filename: file.name,
+    mime_type: file.type,
+    size_bytes: file.size,
+    content_hash: contentHash,
+    version: 1,
+    created_at: isoNow(),
+  }
+  showcaseImageContents.set(asset.id, file.slice(0, file.size, file.type))
+  return clone(asset)
+}
+
 export async function getReferenceImageContentMock(assetId: string): Promise<Blob> {
   const content = referenceImageContents.get(assetId)
   if (!content) throw new ModelStrategyMockError('参考图不存在')
@@ -435,6 +478,40 @@ export async function getBatchPolicyMock(): Promise<BatchPolicyDataDto> {
 
 export async function getBatchPolicyVersionsMock(): Promise<BatchPolicyVersionDto[]> {
   return clone([...batchVersions].reverse())
+}
+
+export async function getGenerationStyleCatalogMock(): Promise<GenerationStyleCatalogDto> {
+  const active = activeBatchVersion()
+  return {
+    policy_version_id: active?.id ?? '',
+    styles: (active?.styles_snapshot ?? []).flatMap((style) => (
+      style.generation_count > 0 && style.description.trim() && style.showcase_image_asset_ids.length
+        ? [{
+            id: style.id,
+            name: style.name,
+            description: style.description,
+            showcase_images: style.showcase_image_asset_ids.map((assetId) => ({
+              asset_id: assetId,
+              content_url: `/api/v1/generation-style-catalog/styles/${style.id}/showcase-images/${assetId}/content`,
+              filename: `${style.name}-样图-${style.showcase_image_asset_ids.indexOf(assetId) + 1}.png`,
+            })),
+          }]
+        : []
+    )),
+  }
+}
+
+export async function getGenerationStyleShowcaseContentMock(
+  styleId: string,
+  assetId: string,
+): Promise<Blob> {
+  const catalog = await getGenerationStyleCatalogMock()
+  const allowed = catalog.styles.some(
+    (style) => style.id === styleId && style.showcase_images.some((image) => image.asset_id === assetId),
+  )
+  const content = showcaseImageContents.get(assetId)
+  if (!allowed || !content) throw new ModelStrategyMockError('风格样图不存在')
+  return content.slice(0, content.size, content.type)
 }
 
 export async function saveBatchPolicyDraftMock(policy: BatchPolicyPayloadDto): Promise<{ draft_saved: true; saved_at: string }> {

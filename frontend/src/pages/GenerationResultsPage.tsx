@@ -15,7 +15,7 @@ import { getSavedLogos, saveLogo } from '../services/savedLogosService'
 import { useGenerationStore } from '../stores/useGenerationStore'
 import { useToastStore } from '../stores/useToastStore'
 import { rememberLastCreationPath } from '../utils/clientNavigation'
-import { resultGridRows } from '../utils/generationResultLayout'
+import { resultGridLayout } from '../utils/generationResultLayout'
 import { useClientLanguage } from '../i18n/useClientLanguage'
 import type { GenerationBatch } from '../types/api'
 
@@ -24,6 +24,7 @@ type RememberedResultSelection = { batchId: string; logoVersionId: string }
 
 const defaultEditInstruction = '重新生成当前相似风格的 logo 图。'
 const candidateOverrideStorageKey = 'logo-generated.result-candidate-overrides'
+const singleEditRecoveryStorageKey = 'logo-generated.single-edit-recovery'
 const iphoneMockupReferenceUrl = `${import.meta.env.BASE_URL}mockups/iphone-home-screen.webp`
 let rememberedResultSelection: RememberedResultSelection | null = null
 
@@ -109,6 +110,7 @@ export function GenerationResultsPage() {
   const [adoptionDialogMode, setAdoptionDialogMode] = useState<'initial' | 'replace' | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
+  const [editRecoveryRequestId, setEditRecoveryRequestId] = useState<string | null>(null)
   const historyScrollRef = useRef<HTMLDivElement>(null)
   const visibleBatches = useMemo(() => batchHistory, [batchHistory])
   const newestBatchId = visibleBatches.at(-1)?.request_id ?? null
@@ -230,6 +232,9 @@ export function GenerationResultsPage() {
         selectedOptionId,
         instruction.trim() || defaultEditInstruction,
       )
+      if (import.meta.env.VITE_USE_MOCK !== 'true') {
+        window.localStorage.setItem(singleEditRecoveryStorageKey, JSON.stringify({ sourceVersionId: selectedOptionId, requestId: accepted.request_id }))
+      }
       if (import.meta.env.VITE_USE_MOCK === 'true') return { id: accepted.request_id, imageUrl: null }
       for (;;) {
         const status = await getSingleEditStatus(accepted.request_id)
@@ -239,12 +244,22 @@ export function GenerationResultsPage() {
         }
         if (status.status !== 'succeeded') throw new Error(t('新版本生成失败，请稍后重试。'))
         const current = status.versions.find((version) => version.id === status.current_version_id)
+        window.localStorage.removeItem(singleEditRecoveryStorageKey)
         return current ? { id: current.id, imageUrl: current.image_url } : null
       }
     } finally {
       setPendingAction(null)
     }
   }
+
+  useEffect(() => {
+    if (!isEditOpen || !selectedOptionId || import.meta.env.VITE_USE_MOCK === 'true') return
+    try {
+      const recovery = JSON.parse(window.localStorage.getItem(singleEditRecoveryStorageKey) ?? 'null') as { sourceVersionId?: string; requestId?: string } | null
+      const requestId = recovery?.sourceVersionId === selectedOptionId ? recovery.requestId ?? null : null
+      window.setTimeout(() => setEditRecoveryRequestId(requestId), 0)
+    } catch { window.setTimeout(() => setEditRecoveryRequestId(null), 0) }
+  }, [isEditOpen, selectedOptionId])
 
   const useEditedVersion = (version: ResultEditVersion) => {
     if (!selectedOption) return
@@ -283,6 +298,7 @@ export function GenerationResultsPage() {
     return <ClientShell><main className="client-main results-empty"><p>{t('暂无可查看的生成结果。')}</p><button className="secondary" onClick={() => navigate('/create')}>{t('返回创作')}</button></main></ClientShell>
   }
 
+  const regeneratingGridLayout = resultGridLayout(Math.max(activeTargetCount ?? batch.target_count, 1))
   const isFailed = batch.status === 'failed'
   const isBusy = pendingAction !== null
   const replaceBusy = isProcessing || isRegenerating || pendingAction !== null
@@ -325,8 +341,10 @@ export function GenerationResultsPage() {
                 if (closest && closest.id !== activeBatchId) selectBatch(closest.id)
               }}
             >
-              {optionsByBatch.map(({ batch: historyBatch, options: historyOptions }) => <section key={historyBatch.request_id} data-batch-id={historyBatch.request_id} className="batch-history-section" aria-label={t('Logo 方案列表')}>
-                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(historyOptions.length) } as CSSProperties}>
+              {optionsByBatch.map(({ batch: historyBatch, options: historyOptions }) => {
+                const gridLayout = resultGridLayout(historyOptions.length)
+                return <section key={historyBatch.request_id} data-batch-id={historyBatch.request_id} className="batch-history-section" aria-label={t('Logo 方案列表')}>
+                <div className={`results-grid results-workspace-grid batch-history-frame ${gridLayout.className}`} style={{ '--result-rows': gridLayout.rows } as CSSProperties}>
                   {historyOptions.map((option, index) => {
                     const retryKey = `${historyBatch.request_id}:${option.slot_index}`
                     const retrying = retryingSlots.includes(retryKey)
@@ -354,10 +372,11 @@ export function GenerationResultsPage() {
                   })}
                 </div>
                 {historyOptions.some((option) => option.status === 'processing' || retryingSlots.includes(`${historyBatch.request_id}:${option.slot_index}`)) && <p className="batch-generating-hint">{t('预计需要 1～3 分钟，请稍等。')}</p>}
-              </section>)}
+              </section>
+              })}
               {isRegenerating && !visibleBatches.some((item) => item.status === 'processing') && <section className="batch-history-section batch-history-generating" aria-label={t('正在生成新一批方案')}>
-                <div className="results-grid results-workspace-grid batch-history-frame" style={{ '--result-rows': resultGridRows(Math.max(activeTargetCount ?? batch.target_count, 1)) } as CSSProperties}>
-                  {Array.from({ length: Math.max(activeTargetCount ?? batch.target_count, 1) }, (_, index) => <article className="result-card result-card-generating" key={`generating-${index}`} aria-label={`${t('正在生成新一批方案')} ${index + 1}`}>
+                <div className={`results-grid results-workspace-grid batch-history-frame ${regeneratingGridLayout.className}`} style={{ '--result-rows': regeneratingGridLayout.rows } as CSSProperties}>
+                  {Array.from({ length: regeneratingGridLayout.count }, (_, index) => <article className="result-card result-card-generating" key={`generating-${index}`} aria-label={`${t('正在生成新一批方案')} ${index + 1}`}>
                     <GenerationProgressTrack />
                   </article>)}
                 </div>
@@ -380,12 +399,12 @@ export function GenerationResultsPage() {
                 <span>{selectedDomain.split('.')[0].toUpperCase()}</span>
               </div>
             </div>
-            <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={isBusy || isRegenerating} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy || isRegenerating} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
+            <div className="decision-actions result-primary-actions"><button className="secondary" type="button" disabled={(isBusy && pendingAction !== 'edit') || isRegenerating} onClick={() => setIsEditOpen(true)}>{t('编辑优化')}</button><button className="primary" type="button" disabled={isBusy || isRegenerating} onClick={() => setAdoptionDialogMode('initial')}>{t(pendingAction === 'adopt' ? '提交中...' : '提交采用')}</button></div>
             <button className="result-replace-link" type="button" disabled={replaceDisabled} aria-disabled={replaceBusy} onClick={() => { if (isProcessing || isRegenerating) { showToast(t('正在执行生图任务，请稍后。')); return } void replaceBatch(true) }}>{t('这批您都不喜欢？换一批')}</button>
           </>}
         </aside>
       </section>
-      {isEditOpen && selectedOption && selectedOptionId && <ResultEditDialog domain={selectedDomain} source={{ id: selectedOptionId, imageUrl: selectedOption.imageUrl }} variant={selectedOption.slot_index} isPageBusy={isBusy} onClose={() => setIsEditOpen(false)} onGenerate={generateEdit} onUse={useEditedVersion} />}
+      {isEditOpen && selectedOption && selectedOptionId && <ResultEditDialog domain={selectedDomain} source={{ id: selectedOptionId, imageUrl: selectedOption.imageUrl }} variant={selectedOption.slot_index} isPageBusy={pendingAction !== null && pendingAction !== 'edit'} recoveryRequestId={editRecoveryRequestId} onClose={() => setIsEditOpen(false)} onGenerate={generateEdit} onUse={useEditedVersion} />}
       {isReplaceConfirmOpen && <BatchReplaceConfirmDialog onClose={() => setIsReplaceConfirmOpen(false)} onConfirm={() => void replaceBatch()} />}
       {adoptionDialogMode && selectedOptionId && <AdoptionConfirmDialog domain={selectedDomain} initialSuggestion={adoptionSuggestion} isChange={adoptionDialogMode === 'replace'} isSubmitting={pendingAction === 'adopt'} errorMessage={adoptionError} onClose={() => { setAdoptionDialogMode(null); setAdoptionError(null) }} onConfirm={(suggestion) => void adopt(suggestion, adoptionDialogMode === 'replace')} />}
     </main>

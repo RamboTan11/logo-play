@@ -30,6 +30,8 @@ class BatchStyleDto(BaseModel):
     id: str = Field(min_length=1, max_length=128)
     name: str = Field(default="", max_length=32)
     generation_count: int = Field(ge=0, le=9)
+    description: str = Field(default="", max_length=280)
+    showcase_image_asset_ids: list[str] = Field(default_factory=list, max_length=3)
     templates: list[BatchPromptTemplateDto] = Field(default_factory=list)
 
 
@@ -84,8 +86,33 @@ class StrategyValidationErrorDto(BaseModel):
         "invalid_reference_image",
         "unverified_model_connection",
         "invalid_generation_count",
+        "invalid_showcase_image",
     ]
     message: str
+
+
+class GenerationStyleShowcaseImageDto(BaseModel):
+    """One protected customer-preview image for a published style."""
+
+    asset_id: str
+    content_url: str
+    filename: str = ""
+
+
+class GenerationStyleCatalogStyleDto(BaseModel):
+    """Customer-safe published style metadata without prompt or template data."""
+
+    id: str
+    name: str
+    description: str
+    showcase_images: list[GenerationStyleShowcaseImageDto]
+
+
+class GenerationStyleCatalogDto(BaseModel):
+    """The currently active customer style catalog."""
+
+    policy_version_id: str
+    styles: list[GenerationStyleCatalogStyleDto]
 
 
 class ReferenceImageAssetDto(BaseModel):

@@ -210,6 +210,14 @@ def validate_batch_policy(
             errors.append(
                 _error(f"{style_prefix}.generation_count", "required", "创建完整模板后才可设置生成数")
             )
+        if not isinstance(style.generation_count, int) or not 0 <= style.generation_count <= 9:
+            errors.append(
+                _error(
+                    f"{style_prefix}.generation_count",
+                    "invalid_generation_count",
+                    "生成数仅支持 0 至 9 的整数",
+                )
+            )
     total_generation_count = sum(style.generation_count for style in policy.styles)
     if total_generation_count > 9:
         errors.append(
@@ -237,7 +245,9 @@ def normalize_reference_requirement(value: str | None) -> str:
 
 
 def rotate_complete_template_combinations(
-    styles: list[BatchStyleDto], cursors: Mapping[str, int]
+    styles: list[BatchStyleDto],
+    cursors: Mapping[str, int],
+    allocation: Mapping[str, int] | None = None,
 ) -> tuple[list[BatchTemplateCombination], dict[str, int]]:
     """Allocate complete template/reference pairs per style without splitting the pair."""
 
@@ -249,10 +259,11 @@ def rotate_complete_template_combinations(
             for template in style.templates
             if _is_structurally_complete_template(template)
         ]
-        if style.generation_count == 0 or not complete_templates:
+        allocated_count = allocation.get(style.id, 0) if allocation is not None else style.generation_count
+        if allocated_count == 0 or not complete_templates:
             continue
         start = cursors.get(style.id, 0) % len(complete_templates)
-        for offset in range(style.generation_count):
+        for offset in range(allocated_count):
             template = complete_templates[(start + offset) % len(complete_templates)]
             combinations.append(
                 BatchTemplateCombination(
@@ -261,7 +272,7 @@ def rotate_complete_template_combinations(
                     reference_image_asset_ids=tuple(template.reference_images),
                 )
             )
-        next_cursors[style.id] = (start + style.generation_count) % len(complete_templates)
+        next_cursors[style.id] = (start + allocated_count) % len(complete_templates)
     return combinations, next_cursors
 
 
@@ -348,6 +359,7 @@ def _error(
         "invalid_reference_image",
         "unverified_model_connection",
         "invalid_generation_count",
+        "invalid_showcase_image",
     ],
     message: str,
 ) -> StrategyValidationErrorDto:

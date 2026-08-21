@@ -64,6 +64,7 @@ interface ActiveGeneration {
   domainSuffix?: DomainSuffix
   submittedAt?: number
   targetCount?: number
+  selectedStyleIds?: string[]
 }
 
 export interface CompletedGeneration {
@@ -79,6 +80,7 @@ interface GenerationState {
   domainSuffix: DomainSuffix
   sourceImageAssetId: string | null
   userReferenceRequirement: string
+  selectedStyleIds: string[]
   error: string | null
   requestId: string | null
   isProcessing: boolean
@@ -96,7 +98,7 @@ interface GenerationState {
   setSourceImageAssetId: (assetId: string | null) => void
   setUserReferenceRequirement: (requirement: string) => void
   clearSourceImage: () => void
-  generate: () => Promise<void>
+  generate: (selectedStyleIds?: string[]) => Promise<void>
   regenerate: () => Promise<void>
   selectBatch: (requestId: string) => void
   restoreActiveGeneration: () => Promise<void>
@@ -116,6 +118,9 @@ function readActiveGeneration(): ActiveGeneration | null {
       isRegenerating: 'is_regenerating' in parsed && parsed.is_regenerating === true,
       targetCount: 'target_count' in parsed && typeof parsed.target_count === 'number'
         ? parsed.target_count
+        : undefined,
+      selectedStyleIds: 'selected_style_ids' in parsed && Array.isArray(parsed.selected_style_ids)
+        ? parsed.selected_style_ids.filter((item): item is string => typeof item === 'string')
         : undefined,
     }
     if (
@@ -138,6 +143,9 @@ function readActiveGeneration(): ActiveGeneration | null {
       domainSuffix: parsed.domain_suffix,
       submittedAt: parsed.submitted_at,
       targetCount: parsed.target_count,
+      selectedStyleIds: 'selected_style_ids' in parsed && Array.isArray(parsed.selected_style_ids)
+        ? parsed.selected_style_ids.filter((item): item is string => typeof item === 'string')
+        : undefined,
     }
   } catch {
     window.localStorage.removeItem(activeGenerationStorageKey)
@@ -152,6 +160,7 @@ function writeActiveGeneration(active: ActiveGeneration): void {
       request_id: active.requestId,
       is_regenerating: active.isRegenerating === true,
       target_count: active.targetCount,
+      selected_style_ids: active.selectedStyleIds ?? [],
     }))
     return
   }
@@ -163,6 +172,7 @@ function writeActiveGeneration(active: ActiveGeneration): void {
     domain_suffix: active.domainSuffix,
     submitted_at: active.submittedAt,
     target_count: active.targetCount,
+    selected_style_ids: active.selectedStyleIds ?? [],
   }))
 }
 
@@ -320,7 +330,6 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         candidates: [],
       }
       const prior = get().batchHistory.filter((item) => item.request_id !== batch.request_id)
-      const disposition = resolveGenerationPollDisposition(response.status, phase)
       set({
         domainLabel: phase === 'restore' ? '' : batch.domain_label,
         domainSuffix: phase === 'restore' ? '.com' : batch.domain_suffix,
@@ -377,6 +386,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     domainLabel: string,
     domainSuffix: DomainSuffix,
     phase: 'creation' | 'regeneration',
+    selectedStyleIds: string[] = [],
     allowInvalidSourceFallback = true,
   ): Promise<void> => {
     recoverySequence += 1
@@ -389,6 +399,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         domainSuffix,
         sourceImageAssetId,
         userReferenceRequirement || null,
+        selectedStyleIds,
       )
     } catch (error) {
       if (
@@ -398,7 +409,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         && sourceImageAssetId
       ) {
         get().clearSourceImage()
-        await begin(domainLabel, domainSuffix, phase, false)
+        await begin(domainLabel, domainSuffix, phase, selectedStyleIds, false)
         return
       }
       throw error
@@ -407,6 +418,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       requestId: accepted.request_id,
       isRegenerating: phase === 'regeneration',
       targetCount: accepted.target_count,
+      selectedStyleIds,
       ...(isMockMode ? {
         domain: `${domainLabel}${domainSuffix}`,
         domainLabel,
@@ -435,6 +447,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
     domainSuffix: initialActiveGeneration?.domainSuffix ?? '.com',
     sourceImageAssetId: null,
     userReferenceRequirement: '',
+    selectedStyleIds: initialActiveGeneration?.selectedStyleIds ?? [],
     error: null,
     requestId: initialActiveGeneration?.requestId ?? null,
     isProcessing: initialActiveGeneration !== null,
@@ -454,7 +467,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       clearGenerationSourceRecovery()
       set({ sourceImageAssetId: null, error: null })
     },
-    generate: async () => {
+    generate: async (selectedStyleIds = []) => {
       if (get().isProcessing || get().isRegenerating) {
         useToastStore.getState().showToast(generationBusyToast())
         return
@@ -465,10 +478,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
         set({ error: '请先输入需要设计 Logo 的域名。' })
         return
       }
-      set({ domainLabel })
+      const normalizedStyleIds = [...new Set(selectedStyleIds.filter(Boolean))]
+      set({ domainLabel, selectedStyleIds: normalizedStyleIds })
       set({ isProcessing: true, error: null })
       try {
-        await begin(domainLabel, domainSuffix, 'creation')
+        await begin(domainLabel, domainSuffix, 'creation', normalizedStyleIds)
       } catch (error) {
         set({
           isProcessing: false,
@@ -485,7 +499,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
       if (!current || !regenerationGate.tryEnter()) return
       set({ isRegenerating: true, error: null })
       try {
-        await begin(current.domainLabel, current.domainSuffix, 'regeneration')
+        await begin(current.domainLabel, current.domainSuffix, 'regeneration', get().selectedStyleIds)
       } catch (error) {
         set({
           isRegenerating: false,
@@ -539,8 +553,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => {
           }
           if (slot?.status === 'processing') {
             sawRetryInProgress = true
-          } else if (slot?.failure?.code === 'retry_in_progress' || !slot?.retry_token) {
-          } else {
+          } else if (slot?.failure?.code !== 'retry_in_progress' && slot?.retry_token) {
             const failureSignature = `${slot.failure?.code ?? ''}:${slot.failure?.message ?? ''}`
             const hasFreshFailure = slot.retry_token !== retryToken
               || failureSignature !== initialFailureSignature

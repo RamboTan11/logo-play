@@ -74,7 +74,27 @@ export interface BatchStyleDto {
   id: string
   name: string
   generation_count: number
+  description: string
+  showcase_image_asset_ids: string[]
   templates: BatchPromptTemplateDto[]
+}
+
+export interface GenerationStyleShowcaseImageDto {
+  asset_id: string
+  content_url: string
+  filename?: string
+}
+
+export interface GenerationStyleCatalogStyleDto {
+  id: string
+  name: string
+  description: string
+  showcase_images: GenerationStyleShowcaseImageDto[]
+}
+
+export interface GenerationStyleCatalogDto {
+  policy_version_id: string
+  styles: GenerationStyleCatalogStyleDto[]
 }
 
 export interface BatchPolicyPayloadDto {
@@ -130,5 +150,6 @@ export interface StrategyValidationErrorDto {
     | 'invalid_reference_image'
     | 'unverified_model_connection'
     | 'invalid_generation_count'
+    | 'invalid_showcase_image'
   message: string
 }
