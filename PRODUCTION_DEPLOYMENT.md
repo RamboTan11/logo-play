@@ -44,6 +44,7 @@ The Compose file runs two services:
 
 - `backend`: FastAPI on container/host port `8099`.
 - `frontend`: real Vite build served by its own Nginx, mapped from host port `8098` to container port `80`. Its `docker/frontend.conf` proxies API and WebSocket traffic to `backend`.
+- The frontend Nginx allows request bodies up to `25 MB`; the FastAPI delivery-image endpoint applies the business limit of `10 MB`. If an additional host-level Nginx, load balancer, or CDN is placed in front of the container, configure its request-body limit to at least `25 MB` as well, or it can return `413` before the application receives the upload.
 
 The production frontend is built with the public base path `/generate-logo/`.
 When a host-level Nginx is used, proxy that prefix to the frontend host port and
